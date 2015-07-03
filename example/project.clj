@@ -1,6 +1,7 @@
 (defproject io.nervous/cljs-lambda-example "0.1.0-SNAPSHOT"
   :dependencies [[org.clojure/clojure "1.7.0"]
-                 [org.clojure/clojurescript "0.0-3308"]]
+                 [org.clojure/clojurescript "0.0-3308"]
+                 [io.nervous/cljs-lambda "0.1.0"]]
   :plugins [[lein-cljsbuild "1.0.6"]
             [lein-npm "0.5.0"]
             [io.nervous/lein-cljs-lambda "0.1.0-SNAPSHOT"]]

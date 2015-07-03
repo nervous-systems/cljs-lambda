@@ -1,6 +1,10 @@
 (ns cljs-lambda.util
-  (:require [cljs.core.async :refer [<!]])
+  (:require [cljs.nodejs :as nodejs]
+            [cljs.core.async :refer [<!]]
+            [clojure.set :as set])
   (:require-macros [cljs.core.async.macros :refer [go]]))
+
+(nodejs/enable-util-print!)
 
 (defn msecs-remaining [{:keys [handle]}]
   (.getRemainingTimeInMillis handle))
@@ -14,18 +18,21 @@
 (defn done! [{:keys [handle]} & [bad good]]
   (.done handle bad good))
 
-(defn context->map [context]
-  {:handle context
-   :identity        (aget context "identity")
-   :aws-request-id  (aget context "awsRequestId")
-   :client-context  (aget context "clientContext")
-   :log-group-name  (aget context "logGroupName")
-   :log-stream-name (aget context "logStreamName")
-   :function-name   (aget context "functionName")})
+(defn context->map [js-context]
+  (-> js-context
+      (js->clj :keywordize-keys true)
+      (assoc :handle js-context)
+      (set/rename-keys
+       {:awsRequestId  :aws-request-id
+        :clientContext :client-context
+        :logGroupName  :log-group-name
+        :logStreamName :log-stream-name
+        :functionName  :function-name})))
 
 (defn wrap-lambda-fn [f]
   (fn [event context]
-    (f event (context->map context))))
+    (f (js->clj event :keywordize-keys true)
+       (context->map context))))
 
 (defn async-lambda-fn [f]
   (wrap-lambda-fn
