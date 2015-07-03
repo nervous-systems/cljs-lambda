@@ -31,7 +31,11 @@
   (wrap-lambda-fn
    (fn [event context]
      (go
-       (try
-         (succeed! context (<! (f event context)))
-         (catch js/Error e
-           (fail! context e)))))))
+       (let [result
+             (try
+               (<! (f event context))
+               (catch js/Error e
+                 e))]
+         (if (instance? js/Error result)
+           (fail!    context result)
+           (succeed! context result)))))))
