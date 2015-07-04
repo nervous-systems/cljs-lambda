@@ -34,6 +34,8 @@
       (.write w s))
     (.getPath file)))
 
+(def default-defaults {:create true})
+
 (defn- augment-project
   [{{:keys [defaults functions cljs-build-id]} :cljs-lambda
     :as project}]
@@ -48,7 +50,7 @@
           (assoc-in [:cljs-lambda :functions]
                     (map (fn [m]
                            (assoc
-                            (merge defaults m)
+                            (merge default-defaults defaults m)
                             :handler (str "index."
                                           (qualified->under (:invoke m)))))
                          functions))))))
