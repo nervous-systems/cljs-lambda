@@ -1,14 +1,20 @@
+{{#source-map}}
 try {
     require("source-map-support").install();
 } catch(err) {
 }
+{{/source-map}}
 require("./{{output-dir}}/goog/bootstrap/nodejs.js");
 require("./{{output-to}}");
 
+function getCljsFunction(fname) {
+    return eval(fname.replace(/-/g, "_").replace(/\//g, "."));
+}
+
 {{#module}}
-goog.require("{{name}}");
+goog.require("{{mangled}}");
 
 {{#function}}
-handler.{{underscores}} = {{dots}};
+exports.{{mangled}} = getCljsFunction("{{name}}");
 {{/function}}
 {{/module}}

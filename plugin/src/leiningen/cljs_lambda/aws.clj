@@ -7,12 +7,13 @@
   (let [args (flatten
               (for [[k v] (set/rename-keys longopts {:name :function-name})]
                 [(str "--" (name k))
-                 (if (keyword? v) (name v) (str v))]))
-        {:keys [exit err] :as r}
-        (apply shell/sh "aws" "lambda" (name cmd) args)]
-    (when (and fatal (not (zero? exit)))
-      (leiningen.core.main/abort err))
-    r))
+                 (if (keyword? v) (name v) (str v))]))]
+    (apply println "aws lambda" (name cmd) args)
+    (let [{:keys [exit err] :as r}
+          (apply shell/sh "aws" "lambda" (name cmd) args)]
+      (if (and fatal (not (zero? exit)))
+        (leiningen.core.main/abort err)
+        r))))
 
 (defn create-function! [fn-spec zip-path]
   (lambda-cli!
@@ -46,7 +47,7 @@
 
   (update-function-config! fn-spec))
 
-(defn deploy [zip-path region creds {:keys [functions] :as cljs-lambda}]
+(defn deploy [zip-path {:keys [functions] :as cljs-lambda}]
   (doseq [{:keys [name handler] :as fn-spec} functions]
     (println "Registering handler" handler "for function" name)
     (deploy-function! (str "fileb://" zip-path) fn-spec)))

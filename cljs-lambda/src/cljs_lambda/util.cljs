@@ -10,24 +10,21 @@
   (.getRemainingTimeInMillis handle))
 
 (defn succeed! [{:keys [handle]} & [arg]]
-  (.succeed handle arg))
+  (.succeed handle (clj->js arg)))
 
 (defn fail! [{:keys [handle]} & [arg]]
-  (.fail handle arg))
+  (.fail handle (clj->js arg)))
 
 (defn done! [{:keys [handle]} & [bad good]]
-  (.done handle bad good))
+  (.done handle (clj->js bad) (clj->js good)))
 
 (defn context->map [js-context]
-  (-> js-context
-      (js->clj :keywordize-keys true)
-      (assoc :handle js-context)
-      (set/rename-keys
-       {:awsRequestId  :aws-request-id
-        :clientContext :client-context
-        :logGroupName  :log-group-name
-        :logStreamName :log-stream-name
-        :functionName  :function-name})))
+  {:handle          js-context
+   :aws-request-id  (aget js-context "awsRequestId")
+   :client-context  (aget js-context "clientContext")
+   :log-group-name  (aget js-context "logGroupName")
+   :log-stream-name (aget js-context "logStreamName")
+   :function-name   (aget js-context "functionName")})
 
 (defn wrap-lambda-fn [f]
   (fn [event context]

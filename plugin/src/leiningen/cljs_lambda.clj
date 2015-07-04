@@ -12,18 +12,20 @@
 (defn- qualified->under [& args]
   (str/join "_" (mapcat #(str/split (str %) #"\.|-|/") args)))
 
-(defn- generate-index [{:keys [output-to output-dir]} fns]
+(defn- hyphen->under [x]
+  (str/join "_" (str/split (name x) #"-")))
+
+(defn- generate-index [compiler-opts fns]
   (let [template (slurp (io/resource "index.mustache"))]
     (stencil/render-string
      template
-     {:output-to output-to
-      :output-dir output-dir
-      :module
-      (for [[ns fns] (group-by namespace (map :invoke fns))]
-        {:name ns
-         :function (for [f (map name fns)]
-                     {:underscores (qualified->under ns f)
-                      :dots (str ns "." f)})})})))
+     (assoc compiler-opts
+            :module
+            (for [[ns fns] (group-by namespace (map :invoke fns))]
+              {:mangled  (hyphen->under ns)
+               :function (for [f fns]
+                           {:mangled (qualified->under ns (name f))
+                            :name f})})))))
 
 (defn- write-index [output-dir s]
   (let [file (io/file output-dir "index.js")]
@@ -45,8 +47,10 @@
           (assoc-in [:cljs-lambda :cljs-build] build)
           (assoc-in [:cljs-lambda :functions]
                     (map (fn [m]
-                           (assoc (merge defaults m)
-                                  :handler (qualified->under (:invoke m))))
+                           (assoc
+                            (merge defaults m)
+                            :handler (str "index."
+                                          (qualified->under (:invoke m)))))
                          functions))))))
 
 (defn build
@@ -56,12 +60,10 @@
 
   (npm/npm project "install")
   (cljsbuild/cljsbuild project "once" (:id cljs-build))
-  (let [{{:keys [output-dir output-to]} :compiler} cljs-build
+  (let [{{:keys [output-dir] :as compiler-opts} :compiler} cljs-build
         project-name (-> project :name name)
         index-path   (->> functions
-                          (generate-index
-                           {:output-dir output-dir
-                            :output-to output-to})
+                          (generate-index compiler-opts)
                           (write-index output-dir))]
     (write-zip
      {:project-name project-name
@@ -71,14 +73,10 @@
 
 (defn deploy
   "Build & deploy a zip file to Lambda, exposing the specified functions"
-  [{:keys [aws cljsbuild cljs-lambda] :as project}]
+  [{:keys [cljsbuild cljs-lambda] :as project}]
   (let [zip-path (build project)
-        {{:keys [output-dir output-to]} :compiler} cljsbuild
-        region (-> aws :lambda :region (or :us-east-1))]
-    (println "Deploying to region" region)
-    (aws/deploy
-     zip-path
-     region aws cljs-lambda)))
+        {{:keys [output-dir output-to]} :compiler} cljsbuild]
+    (aws/deploy zip-path cljs-lambda)))
 
 (defn cljs-lambda
   "Build & deploy AWS Lambda functions"
