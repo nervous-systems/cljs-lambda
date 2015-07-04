@@ -13,4 +13,12 @@
   {:defaults {:role "FIXME"}
    :functions
    [{:name   "work-magic"
-     :invoke {{name}}.core/work-magic}]})
+     :invoke {{name}}.core/work-magic}]}
+  :cljsbuild
+  {:builds [{:id "{{name}}"
+             :source-paths ["src"]
+             :compiler {:output-to "out/{{sanitized}}.js"
+                        :output-dir "out"
+                        :target :nodejs
+                        :optimizations :none
+                        :source-map true}}]})
