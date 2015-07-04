@@ -78,15 +78,29 @@
   [{:keys [cljsbuild cljs-lambda] :as project}]
   (let [zip-path (build project)
         {{:keys [output-dir output-to]} :compiler} cljsbuild]
-    (aws/deploy zip-path cljs-lambda)))
+    (aws/deploy! zip-path cljs-lambda)))
+
+(defn update-config
+  "Write function configs from project.clj to Lambda"
+  [{:keys [cljs-lambda] :as project}]
+  (aws/update-configs! cljs-lambda))
+
+(defn invoke
+  "Invoke the named Lambda function"
+  [_ fn-name & [payload]]
+  (aws/invoke! fn-name payload))
 
 (defn cljs-lambda
   "Build & deploy AWS Lambda functions"
-  {:help-arglists '([build deploy]) :subtasks [#'build #'deploy]}
+  {:help-arglists '([build deploy update-config invoke])
+   :subtasks [#'build #'deploy #'update-config #'invoke]}
 
   ([project] (println (leiningen.help/help-for cljs-lambda)))
 
   ([project subtask & args]
-   (if-let [subtask-fn ({"build" build "deploy" deploy} subtask)]
+   (if-let [subtask-fn ({"build"  build
+                         "deploy" deploy
+                         "invoke" invoke
+                         "update-config" update-config} subtask)]
      (apply subtask-fn (augment-project project) args)
      (println (leiningen.help/help-for cljs-lambda)))))
