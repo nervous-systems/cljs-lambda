@@ -1,23 +1,28 @@
 (ns leiningen.cljs-lambda.aws
-  (:require [clojure.java.io :as io]
+  (:require [cheshire.core :as json]
+            [clojure.java.io :as io]
             [clojure.java.shell :as shell]
             [clojure.set :as set]
-            [cheshire.core :as json])
+            [clojure.string :as str])
   (:import [java.io File]))
 
-(defn lambda-cli! [cmd longopts &
-                   [{:keys [fatal positional] :or {fatal true}}]]
+(defn abs-path [^File f] (.getAbsolutePath f))
+
+(defn aws-cli! [service cmd longopts &
+                [{:keys [fatal positional] :or {fatal true}}]]
   (let [args (flatten
               (for [[k v] (set/rename-keys longopts {:name :function-name})]
                 [(str "--" (name k))
                  (if (keyword? v) (name v) (str v))]))
         args (cond->> args positional (into positional))]
-    (apply println "aws lambda" (name cmd) args)
+    (apply println "aws" service (name cmd) args)
     (let [{:keys [exit err] :as r}
-          (apply shell/sh "aws" "lambda" (name cmd) args)]
+          (apply shell/sh "aws" service (name cmd) args)]
       (if (and fatal (not (zero? exit)))
         (leiningen.core.main/abort err)
         r))))
+
+(def lambda-cli! (partial aws-cli! "lambda"))
 
 (defn create-function! [fn-spec zip-path]
   (lambda-cli!
@@ -64,7 +69,7 @@
 
 (defn invoke! [fn-name payload]
   (let [out-file (File/createTempFile "lambda-output" ".json")
-        out-path (.getAbsolutePath out-file)]
+        out-path (abs-path out-file)]
     (lambda-cli!
      :invoke
      {:function-name fn-name :payload payload}
@@ -76,3 +81,25 @@
          (json/parse-string output true)
          (catch Exception e
            [:not-json output]))))))
+
+(defn install-iam-role! [role-name role policy]
+  (let [role-tmp-file   (File/createTempFile "iam-role" nil)
+        policy-tmp-file (File/createTempFile "iam-policy" nil)]
+    (spit role-tmp-file role)
+    (spit policy-tmp-file policy)
+    (let [{role-arn :out}
+          (aws-cli!
+           "iam" "create-role"
+           {:role-name role-name
+            :assume-role-policy-document
+            (str "file://" (abs-path role-tmp-file))
+            :output "text"
+            :query "Role.Arn"})]
+      (aws-cli!
+       "iam" "put-role-policy"
+       {:role-name role-name
+        :policy-name role-name
+        :policy-document (str "file://" (abs-path policy-tmp-file))})
+      (.delete role-tmp-file)
+      (.delete policy-tmp-file)
+      (str/trim role-arn))))

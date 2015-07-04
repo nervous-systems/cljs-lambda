@@ -4,7 +4,7 @@
                  [io.nervous/cljs-lambda "0.1.1"]]
   :plugins [[lein-cljsbuild "1.0.6"]
             [lein-npm "0.5.0"]
-            [io.nervous/lein-cljs-lambda "0.1.0"]]
+            [io.nervous/lein-cljs-lambda "0.1.1"]]
   :node-dependencies [[source-map-support "0.2.8"]]
   :source-paths ["src"]
   :cljs-lambda
