@@ -6,4 +6,4 @@
   (async-lambda-fn
    (fn [{:keys [variety]} context]
      (go
-       (str "Sorry, I don't yet know how to work: " variety)))))
+       (js/Error (str "Sorry, I don't yet know how to work: '" variety "' magic"))))))
