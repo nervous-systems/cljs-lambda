@@ -1,7 +1,7 @@
 # cljs-lambda
 
 A Lein plugin, template and small Clojurescript library for exposing functions
-via [AWS Lambda](http://aws.amazon.com/documentation/lambda/)
+via [AWS Lambda](http://aws.amazon.com/documentation/lambda/).
 
 ```sh
 $ lein new cljs-lambda my-lambda-project
