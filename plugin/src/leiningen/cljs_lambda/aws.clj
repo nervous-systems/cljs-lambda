@@ -3,7 +3,8 @@
             [clojure.java.io :as io]
             [clojure.java.shell :as shell]
             [clojure.set :as set]
-            [clojure.string :as str])
+            [clojure.string :as str]
+            [base64-clj.core :as base64])
   (:import [java.io File]))
 
 (defn abs-path [^File f] (.getAbsolutePath f))
@@ -70,17 +71,17 @@
 (defn invoke! [fn-name payload]
   (let [out-file (File/createTempFile "lambda-output" ".json")
         out-path (abs-path out-file)]
-    (lambda-cli!
-     :invoke
-     {:function-name fn-name :payload payload}
-     {:positional [out-path]})
-
-    (let [output (slurp out-path)]
-      (clojure.pprint/pprint
-       (try
-         (json/parse-string output true)
-         (catch Exception e
-           [:not-json output]))))))
+    (let [{logs :out} (lambda-cli!
+                       :invoke
+                       {:function-name fn-name :payload payload :log-type "Tail" :query "LogResult"}
+                       {:positional [out-path]})]
+      (println (base64/decode (read-string logs)))
+      (let [output (slurp out-path)]
+        (clojure.pprint/pprint
+         (try
+           (json/parse-string output true)
+           (catch Exception e
+             [:not-json output])))))))
 
 (defn install-iam-role! [role-name role policy]
   (let [role-tmp-file   (File/createTempFile "iam-role" nil)
