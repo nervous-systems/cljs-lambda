@@ -9,9 +9,14 @@
 
 (defn abs-path [^File f] (.getAbsolutePath f))
 
+(defn merge-global-opts [{:keys [aws-profile] :as global-opts} command-opts]
+  (cond-> command-opts aws-profile (assoc :profile (name aws-profile))))
+
 (defn aws-cli! [service cmd longopts &
-                [{:keys [fatal positional] :or {fatal true}}]]
-  (let [args (flatten
+                [{:keys [fatal positional] :or {fatal true}
+                  :as global-opts}]]
+  (let [longopts (merge-global-opts global-opts longopts)
+        args (flatten
               (for [[k v] (set/rename-keys longopts {:name :function-name})]
                 [(str "--" (name k))
                  (if (keyword? v) (name v) (str v))]))
@@ -25,82 +30,107 @@
 
 (def lambda-cli! (partial aws-cli! "lambda"))
 
-(defn create-function! [fn-spec zip-path]
+(defn create-function! [fn-spec zip-path global-opts]
   (lambda-cli!
    :create-function
    (-> fn-spec
        (select-keys #{:name :role :handler})
-       (assoc :runtime "nodejs" :zip-file zip-path))))
+       (assoc :runtime "nodejs" :zip-file zip-path))
+   global-opts))
 
-(defn function-exists? [fn-name]
-  (-> (lambda-cli! :get-function {:function-name fn-name} {:fatal false})
+(defn function-exists? [fn-name global-opts]
+  (-> (lambda-cli! :get-function
+                   {:function-name fn-name}
+                   (assoc global-opts :fatal false))
       :exit
       zero?))
 
-(defn update-function-config! [fn-spec]
+(defn update-function-config! [fn-spec global-opts]
   (lambda-cli!
    :update-function-configuration
    (select-keys fn-spec
                 #{:name :role :handler :description
-                  :timeout :memory-size})))
+                  :timeout :memory-size})
+   global-opts))
 
-(defn update-function-code! [{:keys [name]} zip-path]
+(defn update-function-code! [{:keys [name]} zip-path global-opts]
   (lambda-cli!
    :update-function-code
-   {:name name :zip-file zip-path}))
+   {:name name :zip-file zip-path}
+   global-opts))
 
-(defn deploy-function! [zip-path {fn-name :name create :create :as fn-spec}]
-  (cond (function-exists? fn-name) (update-function-code! fn-spec zip-path)
-        create (create-function! fn-spec zip-path)
+(defn deploy-function!
+  [zip-path {fn-name :name create :create :as fn-spec} global-opts]
+  (cond (function-exists? fn-name global-opts)
+        (update-function-code! fn-spec zip-path global-opts)
+        create (create-function! fn-spec zip-path global-opts)
         :else (leiningen.core.main/abort
                "Function" fn-name "doesn't exist & :create not set"))
 
-  (update-function-config! fn-spec))
+  (update-function-config! fn-spec global-opts))
 
-(defn deploy! [zip-path {:keys [functions] :as cljs-lambda}]
+(defn deploy!
+  [zip-path {:keys [functions aws-profile global-aws-opts] :as cljs-lambda}]
   (doseq [{:keys [name handler] :as fn-spec} functions]
     (println "Registering handler" handler "for function" name)
-    (deploy-function! (str "fileb://" zip-path) fn-spec)))
+    (deploy-function!
+     (str "fileb://" zip-path)
+     fn-spec
+     global-aws-opts)))
 
-(defn update-configs! [{:keys [functions] :as cljs-lambda}]
+(defn update-configs!
+  [{:keys [functions aws-profile global-aws-opts] :as cljs-lambda}]
   (doseq [{fn-name :name :as fn-spec} functions]
-    (when-not (function-exists? fn-name)
+    (when-not (function-exists? fn-name global-aws-opts)
       (leiningen.core.main/abort fn-name "doesn't exist & can't create"))
-    (update-function-config! fn-spec)))
+    (update-function-config! fn-spec global-aws-opts)))
 
-(defn invoke! [fn-name payload]
+(defn invoke! [fn-name payload global-opts]
   (let [out-file (File/createTempFile "lambda-output" ".json")
-        out-path (abs-path out-file)]
-    (let [{logs :out} (lambda-cli!
-                       :invoke
-                       {:function-name fn-name :payload payload :log-type "Tail" :query "LogResult"}
-                       {:positional [out-path]})]
-      (println (base64/decode (read-string logs)))
-      (let [output (slurp out-path)]
-        (clojure.pprint/pprint
-         (try
-           (json/parse-string output true)
-           (catch Exception e
-             [:not-json output])))))))
+        out-path (abs-path out-file)
+        {logs :out} (lambda-cli!
+                     :invoke
+                     {:function-name fn-name
+                      :payload payload
+                      :log-type "Tail"
+                      :query "LogResult"}
+                     (assoc global-opts :positional [out-path]))]
+    (println (base64/decode (read-string logs)))
+    (let [output (slurp out-path)]
+      (clojure.pprint/pprint
+       (try
+         (json/parse-string output true)
+         (catch Exception e
+           [:not-json output]))))))
 
-(defn install-iam-role! [role-name role policy]
+(defn assume-role-policy-doc! [role-name file-path global-opts]
+  (-> (aws-cli!
+       "iam" "create-role"
+       {:role-name role-name
+        :assume-role-policy-document
+        (str "file://" file-path)
+        :output "text"
+        :query "Role.Arn"}
+       global-opts)
+      :out
+      str/trim))
+
+(defn put-role-policy! [role-name file-path global-opts]
+  (aws-cli!
+   "iam" "put-role-policy"
+   {:role-name role-name
+    :policy-name role-name
+    :policy-document (str "file://" file-path)}
+   global-opts))
+
+(defn install-iam-role! [role-name role policy global-opts]
   (let [role-tmp-file   (File/createTempFile "iam-role" nil)
         policy-tmp-file (File/createTempFile "iam-policy" nil)]
     (spit role-tmp-file role)
     (spit policy-tmp-file policy)
-    (let [{role-arn :out}
-          (aws-cli!
-           "iam" "create-role"
-           {:role-name role-name
-            :assume-role-policy-document
-            (str "file://" (abs-path role-tmp-file))
-            :output "text"
-            :query "Role.Arn"})]
-      (aws-cli!
-       "iam" "put-role-policy"
-       {:role-name role-name
-        :policy-name role-name
-        :policy-document (str "file://" (abs-path policy-tmp-file))})
+    (let [role-arn (assume-role-policy-doc!
+                    role-name (abs-path role-tmp-file) global-opts)]
+      (put-role-policy! role-name (abs-path policy-tmp-file) global-opts)
       (.delete role-tmp-file)
       (.delete policy-tmp-file)
-      (str/trim role-arn))))
+      role-arn)))

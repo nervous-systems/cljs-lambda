@@ -38,7 +38,7 @@
 (def default-defaults {:create true})
 
 (defn- augment-project
-  [{{:keys [defaults functions cljs-build-id]} :cljs-lambda
+  [{{:keys [defaults functions cljs-build-id aws-profile]} :cljs-lambda
     :as project}]
   (let [{:keys [builds]} (cljsbuild.config/extract-options project)
         [build] (if-not cljs-build-id
@@ -48,6 +48,7 @@
       (leiningen.core.main/abort "Can't find cljsbuild build")
       (-> project
           (assoc-in [:cljs-lambda :cljs-build] build)
+          (assoc-in [:cljs-lambda :global-aws-opts :aws-profile] aws-profile)
           (assoc-in [:cljs-lambda :functions]
                     (map (fn [m]
                            (assoc
@@ -88,17 +89,18 @@
 
 (defn invoke
   "Invoke the named Lambda function"
-  [_ fn-name & [payload]]
-  (aws/invoke! fn-name payload))
+  [{{:keys [global-aws-opts]} :cljs-lambda} fn-name & [payload]]
+  (aws/invoke! fn-name payload global-aws-opts))
 
 (defn default-iam-role
   "Install an IAM role under which a Lambda function can execute, and stick it
   in project.clj"
-  [project]
+  [{{:keys [global-aws-opts]} :cljs-lambda :as project}]
   (let [arn (aws/install-iam-role!
              :cljs-lambda-default
              (slurp (io/resource "default-iam-role.json"))
-             (slurp (io/resource "default-iam-policy.json")))]
+             (slurp (io/resource "default-iam-policy.json"))
+             global-aws-opts)]
     (println "Created role" arn)
     (change/change project [:cljs-lambda :defaults]
                    (fn [m & _]
