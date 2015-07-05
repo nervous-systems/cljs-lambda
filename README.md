@@ -24,13 +24,13 @@ In your Clojurescript project's `:plugins` vector.
 # The Plugin
 
 ## project.clj Excerpt
-From [the example project](https://github.com/nervous-systems/cljs-lambda/blob/master/example/project.clj)
+From [the example project](https://github.com/nervous-systems/cljs-lambda/blob/master/example/project.clj):
 
 ```clojure
 {:cljs-lambda
  {:cljs-build-id "cljs-lambda-example"
   :defaults
-  {:role    "arn:aws:iam::151963828411:role/lambda_basic_execution"}
+  {:role   "arn:aws:iam::151963828411:role/lambda_basic_execution"}
  :functions
  [{:name   "dog-bark"
    :invoke cljs-lambda-example.dog/bark}
@@ -65,11 +65,14 @@ Will update the remote (Lambda) configuration of all of the functions listed in 
 The plugin depends on `cljsbuild`, and assumes there is a `:cljsbuild` section
 in your `project.clj`.  A deployment or build via `cljs-lambda` invokes
 `cljsbuild` - it'll run either the first build in the `:builds` vector, or the
-one identified by `[:cljs-lambda :cljs-build-id]`.  It could accept build
-identifiers via the CLI, also.
+one identified by `[:cljs-lambda :cljs-build-id]`. 
 
 Source map support will be enabled if the `:source-map` key of the active build
 is `true`.
+
+## Limitations
+
+ - `deploy` means "deploy all functions in this project".  It could be changed pretty easily.
 
 # The Library
 
