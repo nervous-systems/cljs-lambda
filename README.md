@@ -25,11 +25,12 @@ In your Clojurescript project's `:plugins` vector.
 # The Plugin
 
 ## project.clj Excerpt
-From [the example project](https://github.com/nervous-systems/cljs-lambda/blob/master/example/project.clj):
+See [the example project](https://github.com/nervous-systems/cljs-lambda/blob/master/example/project.clj):
 
 ```clojure
 {:cljs-lambda
  {:cljs-build-id "cljs-lambda-example"
+  :aws-profile "XYZ"
   :defaults
   {:role    "arn:aws:iam::151963828411:role/lambda_basic_execution"}
   :functions
@@ -38,6 +39,8 @@ From [the example project](https://github.com/nervous-systems/cljs-lambda/blob/m
    {:name   "cat-meow"
     :invoke cljs-lambda-example.cat/meow}]}}
 ```
+
+If `:aws-profile` is present, the value will be passed as `--profile` to all invocations of the AWS CLI.
 
 ## Function Configuration
 
