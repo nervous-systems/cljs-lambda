@@ -72,6 +72,8 @@ is `true`.
 ## Limitations
 
  - `deploy` means "deploy all functions in this project".  It could be changed pretty easily.
+ - I guess we ought to use the docstring for `:description`, if none is supplied.
+ - PR's welcome.
 
 # The Library
 
