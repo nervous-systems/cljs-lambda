@@ -3,6 +3,8 @@
 A Lein plugin, template and small Clojurescript library for exposing functions
 via [AWS Lambda](http://aws.amazon.com/documentation/lambda/).
 
+[Blog post/tutorial](https://nervous.io/clojure/clojurescript/aws/lambda/node/lein/2015/07/05/lambda/).
+  
 ```sh
 $ lein new cljs-lambda my-lambda-project
 $ cd my-lambda-project
