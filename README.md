@@ -32,11 +32,11 @@ From [the example project](https://github.com/nervous-systems/cljs-lambda/blob/m
  {:cljs-build-id "cljs-lambda-example"
   :defaults
   {:role   "arn:aws:iam::151963828411:role/lambda_basic_execution"}
- :functions
- [{:name   "dog-bark"
-   :invoke cljs-lambda-example.dog/bark}
-  {:name   "cat-meow"
-   :invoke cljs-lambda-example.cat/meow}]}}
+  :functions
+  [{:name   "dog-bark"
+    :invoke cljs-lambda-example.dog/bark}
+   {:name   "cat-meow"
+    :invoke cljs-lambda-example.cat/meow}]}}
 ```
 
 ## Function Configuration
