@@ -7,7 +7,6 @@ via [AWS Lambda](http://aws.amazon.com/documentation/lambda/)
 $ lein new cljs-lambda my-lambda-project
 $ cd my-lambda-project
 $ lein cljs-lambda default-iam-role
-# project.clj now has a valid key in [:cljs-lambda :defaults :role]
 $ lein cljs-lambda deploy
 $ lein cljs-lambda invoke work-magic '{"variety": "black"}'
 ```
