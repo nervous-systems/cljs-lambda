@@ -14,7 +14,7 @@ $ lein cljs-lambda invoke work-magic '{"variety": "black"}'
 
 The above requires a recent [Node](https://nodejs.org/) runtime, and a properly-configured (`aws configure`) [AWS CLI](https://github.com/aws/aws-cli) installation.
 
-Or, put
+Or, put:
 
 [![Clojars
 Project](http://clojars.org/io.nervous/lein-cljs-lambda/latest-version.svg)](http://clojars.org/io.nervous/lein-cljs-lambda)
