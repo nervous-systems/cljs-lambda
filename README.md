@@ -100,6 +100,7 @@ one identified by `[:cljs-lambda :cljs-build-id]`.
  - Source map support will be enabled if the `:source-map` key of the active build
 is `true`.
  - If `:optimizations` is set to `:advanced` on the active build, the zip output will be structured accordingly (i.e. it'll only contain `index.js` and the single compiler output file).
+ - With `:advanced`, `*main-cli-fn*` is required to be set (i.e. `(set! *main-cli-fn* identity)`)
 
 ## Limitations
 
