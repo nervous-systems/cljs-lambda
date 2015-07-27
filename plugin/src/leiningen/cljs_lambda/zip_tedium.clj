@@ -20,14 +20,23 @@
                (not= (extension file) "zip"))
       (zip-entry zip-stream file))))
 
-(defn write-zip [{:keys [project-name index-path out-path zip-name]}]
+(defmulti  stuff-zip (fn [_ {:keys [optimizations]} _] optimizations))
+(defmethod stuff-zip :default [zip-stream {:keys [output-dir]} {:keys [index-path]}]
+  (zip-entry zip-stream (io/file index-path) "index.js")
+  (zip-below zip-stream (io/file output-dir))
+  (zip-below zip-stream (io/file "node_modules")))
+
+(defmethod stuff-zip :advanced [zip-stream {:keys [output-to]} {:keys [index-path]}]
+  (zip-entry zip-stream (io/file index-path) "index.js")
+  (zip-entry zip-stream (io/file output-to)))
+
+(defn write-zip [{:keys [output-dir] :as compiler-opts}
+                 {:keys [project-name zip-name] :as spec}]
   (let [zip-file   (File/createTempFile project-name nil)
         zip-stream (ZipOutputStream. (io/output-stream (.getPath zip-file)))]
-    (zip-entry zip-stream (io/file index-path) "index.js")
-    (zip-below zip-stream (io/file out-path))
-    (zip-below zip-stream (io/file "node_modules"))
+    (stuff-zip zip-stream compiler-opts spec)
     (.close zip-stream)
-    (let [destination-file (io/file out-path zip-name)
+    (let [destination-file (io/file output-dir zip-name)
           path (.getAbsolutePath destination-file)]
       (println "Writing zip to" path)
       (.delete destination-file)

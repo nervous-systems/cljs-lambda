@@ -7,7 +7,7 @@
             [leiningen.cljsbuild :as cljsbuild]
             [leiningen.change :as change]
             [leiningen.cljsbuild.config :as cljsbuild.config]
-            [stencil.core :as stencil])
+            [clostache.parser])
   (:import [java.io File]))
 
 (defn- qualified->under [& args]
@@ -16,9 +16,12 @@
 (defn- hyphen->under [x]
   (str/join "_" (str/split (name x) #"-")))
 
-(defn- generate-index [compiler-opts fns]
-  (let [template (slurp (io/resource "index.mustache"))]
-    (stencil/render-string
+(defn- generate-index [{:keys [optimizations] :as compiler-opts} fns]
+  (let [template (slurp (io/resource
+                         (if (= optimizations :advanced)
+                           "index-advanced.mustache"
+                           "index.mustache")))]
+    (clostache.parser/render
      template
      (assoc compiler-opts
             :module
@@ -64,15 +67,15 @@
 
   (npm/npm project "install")
   (cljsbuild/cljsbuild project "once" (:id cljs-build))
-  (let [{{:keys [output-dir] :as compiler-opts} :compiler} cljs-build
+  (let [{{:keys [output-dir optimizations] :as compiler} :compiler} cljs-build
         project-name (-> project :name name)
         index-path   (->> functions
-                          (generate-index compiler-opts)
+                          (generate-index compiler)
                           (write-index output-dir))]
     (write-zip
+     compiler
      {:project-name project-name
       :index-path index-path
-      :out-path output-dir
       :zip-name (str project-name ".zip")})))
 
 (defn deploy

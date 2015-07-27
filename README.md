@@ -3,8 +3,16 @@
 A Lein plugin, template and small Clojurescript library for exposing functions
 via [AWS Lambda](http://aws.amazon.com/documentation/lambda/).
 
-[Blog post/tutorial](https://nervous.io/clojure/clojurescript/aws/lambda/node/lein/2015/07/05/lambda/).
-  
+ - Low instance warmup penalty
+ - Specify execution roles and resource limits in project definition
+ - Use [core.async](https://github.com/clojure/core.async) for deferred completion
+ - Smaller zip files with `:optimizations` `:advanced` support
+ - [Blog post/tutorial](https://nervous.io/clojure/clojurescript/aws/lambda/node/lein/2015/07/05/lambda/)
+
+# Examples
+
+## Get Started
+
 ```sh
 $ lein new cljs-lambda my-lambda-project
 $ cd my-lambda-project
@@ -21,6 +29,24 @@ Or, put:
 Project](http://clojars.org/io.nervous/lein-cljs-lambda/latest-version.svg)](http://clojars.org/io.nervous/lein-cljs-lambda)
 
 In your Clojurescript project's `:plugins` vector.
+
+## A Simple Function
+
+```clojure
+(ns cljs-lambda-example.cat
+  (:require [cljs-lambda.util :refer [async-lambda-fn]]))
+
+(def ^:export meow
+  (async-lambda-fn
+   (fn [{meow-target :name} context]
+     (go
+       (<! (async/timeout 1000))
+       {:from "the-cat"
+        :to meow-target
+        :message "I'm  meowing at you"}))))
+```
+
+[And its associated project.clj](https://github.com/nervous-systems/cljs-lambda/blob/master/example/project.clj)
 
 # The Plugin
 
@@ -40,7 +66,7 @@ See [the example project](https://github.com/nervous-systems/cljs-lambda/blob/ma
     :invoke cljs-lambda-example.cat/meow}]}}
 ```
 
-If `:aws-profile` is present, the value will be passed as `--profile` to all invocations of the AWS CLI.
+If `:aws-profile` is present, the value will be passed as `--profile` to all invocations of the AWS CLI, otherwise the CLI's default profile will be used.
 
 ## Function Configuration
 
@@ -69,10 +95,11 @@ Will update the remote (Lambda) configuration of all of the functions listed in 
 The plugin depends on `cljsbuild`, and assumes there is a `:cljsbuild` section
 in your `project.clj`.  A deployment or build via `cljs-lambda` invokes
 `cljsbuild` - it'll run either the first build in the `:builds` vector, or the
-one identified by `[:cljs-lambda :cljs-build-id]`. 
+one identified by `[:cljs-lambda :cljs-build-id]`.
 
-Source map support will be enabled if the `:source-map` key of the active build
+ - Source map support will be enabled if the `:source-map` key of the active build
 is `true`.
+ - If `:optimizations` is set to `:advanced` on the active build, the zip output will be structured accordingly (i.e. it'll only contain `index.js` and the single compiler output file).
 
 ## Limitations
 
@@ -88,18 +115,26 @@ It's pretty tiny - please see the [example project](https://github.com/nervous-s
 
 # Invoking
 
-If you're interested in programmatically invoking Lambda functions from Clojure, it's pretty easy with [eulalie](https://github.com/nervous-systems/eulalie), an asynchronous pure-Clojure AWS client:
+## CLI
+
+```sh
+$ lein cljs-lambda invoke my-lambda-fn '{"arg1": "value" ...}'
+```
+
+## Programmatically
+
+If you're interested in programmatically invoking Lambda functions from Clojure/Clojurescript, it's pretty easy with [eulalie](https://github.com/nervous-systems/eulalie):
 
 ```clojure
 (eulalie.lambda.util/invoke!
- {:access-key ... :secret-key ...}
- "my-lambda-function"
+ {:access-key ... :secret-key ... [:token :region etc.]}
+ "my-lambda-fn"
  :request-response
- {:arg1 "value" :arg2 [:value]})
+ {:arg1 "value" :arg2 ["value"]})
 ```
 
 ## License
 
-eulalie is free and unencumbered public domain software. For more
+cljs-lambda is free and unencumbered public domain software. For more
 information, see http://unlicense.org/ or the accompanying UNLICENSE
 file.
