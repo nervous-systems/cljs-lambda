@@ -32,13 +32,11 @@
 
 (defn write-zip [{:keys [output-dir] :as compiler-opts}
                  {:keys [project-name zip-name] :as spec}]
-  (let [zip-file   (File/createTempFile project-name nil)
-        zip-stream (ZipOutputStream. (io/output-stream (.getPath zip-file)))]
-    (stuff-zip zip-stream compiler-opts spec)
-    (.close zip-stream)
-    (let [destination-file (io/file output-dir zip-name)
-          path (.getAbsolutePath destination-file)]
-      (println "Writing zip to" path)
-      (.delete destination-file)
-      (.renameTo zip-file destination-file)
+  (let [zip-file (io/file output-dir zip-name)
+        path (.getAbsolutePath zip-file)]
+    (println "Writing zip to" path)
+    (.delete zip-file)
+    (let [zip-stream (ZipOutputStream. (io/output-stream zip-file))]
+      (stuff-zip zip-stream compiler-opts spec)
+      (.close zip-stream)
       path)))
