@@ -103,6 +103,17 @@
          (catch Exception e
            [:not-json output]))))))
 
+(defn get-role-arn! [role-name global-opts]
+  (let [{:keys [exit out]}
+        (aws-cli!
+         "iam" "get-role"
+         {:role-name role-name
+          :output "text"
+          :query "Role.Arn"}
+         (assoc global-opts :fatal false))]
+    (when (zero? exit)
+      (str/trim out))))
+
 (defn assume-role-policy-doc! [role-name file-path global-opts]
   (-> (aws-cli!
        "iam" "create-role"
@@ -124,13 +135,15 @@
    global-opts))
 
 (defn install-iam-role! [role-name role policy global-opts]
-  (let [role-tmp-file   (File/createTempFile "iam-role" nil)
-        policy-tmp-file (File/createTempFile "iam-policy" nil)]
-    (spit role-tmp-file role)
-    (spit policy-tmp-file policy)
-    (let [role-arn (assume-role-policy-doc!
-                    role-name (abs-path role-tmp-file) global-opts)]
-      (put-role-policy! role-name (abs-path policy-tmp-file) global-opts)
-      (.delete role-tmp-file)
-      (.delete policy-tmp-file)
-      role-arn)))
+  (if-let [role-arn (get-role-arn! role-name global-opts)]
+    role-arn
+    (let [role-tmp-file   (File/createTempFile "iam-role" nil)
+          policy-tmp-file (File/createTempFile "iam-policy" nil)]
+      (spit role-tmp-file role)
+      (spit policy-tmp-file policy)
+      (let [role-arn (assume-role-policy-doc!
+                      role-name (abs-path role-tmp-file) global-opts)]
+        (put-role-policy! role-name (abs-path policy-tmp-file) global-opts)
+        (.delete role-tmp-file)
+        (.delete policy-tmp-file)
+        role-arn))))

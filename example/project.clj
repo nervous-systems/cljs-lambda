@@ -10,7 +10,7 @@
   :cljs-lambda
   {:cljs-build-id "cljs-lambda-example"
    :defaults
-   {:role   "arn:aws:iam::151963828411:role/lambda_basic_execution"
+   {:role "arn:aws:iam::151963828411:role/cljs-lambda-default"
     :create true}
    :functions
    [{:name   "dog-bark"

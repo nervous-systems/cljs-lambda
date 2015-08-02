@@ -96,15 +96,14 @@
   (aws/invoke! fn-name payload global-aws-opts))
 
 (defn default-iam-role
-  "Install an IAM role under which a Lambda function can execute, and stick it
-  in project.clj"
+  "Install a Lambda-compatible IAM role, and stick it in project.clj"
   [{{:keys [global-aws-opts]} :cljs-lambda :as project}]
   (let [arn (aws/install-iam-role!
              :cljs-lambda-default
              (slurp (io/resource "default-iam-role.json"))
              (slurp (io/resource "default-iam-policy.json"))
              global-aws-opts)]
-    (println "Created role" arn)
+    (println "Using role" arn)
     (change/change project [:cljs-lambda :defaults]
                    (fn [m & _]
                      (assoc m :role arn)))))
