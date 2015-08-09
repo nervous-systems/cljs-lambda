@@ -21,7 +21,7 @@ $ lein cljs-lambda deploy
 $ lein cljs-lambda invoke work-magic '{"variety": "black"}'
 ```
 
-The above requires a recent [Node](https://nodejs.org/) runtime, and a properly-configured (`aws configure`) [AWS CLI](https://github.com/aws/aws-cli) installation.
+The above requires a recent [Node](https://nodejs.org/) runtime, and a properly-configured (`aws configure`) [AWS CLI](https://github.com/aws/aws-cli) installation **>= 1.7.31**.  Please run `pip install --upgrade awscli` if you're using an older version (`aws --version`).
 
 Or, put:
 
