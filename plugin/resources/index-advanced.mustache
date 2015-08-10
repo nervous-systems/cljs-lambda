@@ -1,11 +1,7 @@
 require("./{{output-to}}");
 
-function getCljsFunction(fname) {
-    return eval(fname.replace(/-/g, "_").replace(/\//g, "."));
-}
-
 {{#module}}
 {{#function}}
-exports.{{mangled}} = getCljsFunction("{{name}}");
+exports.{{export}} = {{js-name}};
 {{/function}}
 {{/module}}

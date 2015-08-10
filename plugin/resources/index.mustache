@@ -7,14 +7,10 @@ try {
 require("./{{output-dir}}/goog/bootstrap/nodejs.js");
 require("./{{output-to}}");
 
-function getCljsFunction(fname) {
-    return eval(fname.replace(/-/g, "_").replace(/\//g, "."));
-}
-
 {{#module}}
-goog.require("{{mangled}}");
+goog.require("{{name}}");
 
 {{#function}}
-exports.{{mangled}} = getCljsFunction("{{name}}");
+exports.{{export}} = {{js-name}};
 {{/function}}
 {{/module}}
