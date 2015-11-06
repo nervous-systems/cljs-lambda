@@ -2,8 +2,8 @@
   :description "FIXME"
   :url "http://please.FIXME"
   :dependencies [[org.clojure/clojure "1.7.0"]
-                 [org.clojure/clojurescript "0.0-3308"]
-                 [org.clojure/core.async "0.1.346.0-17112a-alpha"]
+                 [org.clojure/clojurescript "1.7.145"]
+                 [org.clojure/core.async "0.2.371"]
                  [io.nervous/cljs-lambda "0.1.2"]]
   :plugins [[lein-cljsbuild "1.0.6"]
             [lein-npm "0.5.0"]
