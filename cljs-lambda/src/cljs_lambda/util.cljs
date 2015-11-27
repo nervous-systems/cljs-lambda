@@ -1,30 +1,67 @@
 (ns cljs-lambda.util
   (:require [cljs.nodejs :as nodejs]
-            [cljs.core.async :refer [<!]]
+            [cljs.core.async :as async :refer [<! >!]]
             [clojure.set :as set])
   (:require-macros [cljs.core.async.macros :refer [go]]))
 
 (nodejs/enable-util-print!)
 
-(defn msecs-remaining [{:keys [handle]}]
-  (.getRemainingTimeInMillis handle))
+(defn- context-dispatch [{:keys [cljs-lambda/context-type]} & [arg]]
+  context-type)
 
-(defn succeed! [{:keys [handle]} & [arg]]
-  (.succeed handle (clj->js arg)))
+(defn- channel-result [{:keys [cljs-lambda/resp-chan]} & [arg]]
+  (go
+    (when arg
+      (>! resp-chan arg))
+    (async/close! resp-chan))
+  arg)
 
-(defn fail! [{:keys [handle]} & [arg]]
+(defmulti succeed! context-dispatch)
+(defmulti fail!    context-dispatch)
+(defmulti done!    context-dispatch)
+(defmulti msecs-remaining context-dispatch)
+
+(defmethod fail! :default [{:keys [handle]} & [arg]]
   (.fail handle (clj->js arg)))
+(defmethod fail! :mock [context & [arg]]
+  (channel-result context arg))
 
-(defn done! [{:keys [handle]} & [bad good]]
+(defmethod succeed! :default [{:keys [handle]} & [arg]]
+  (.succeed handle (clj->js arg)))
+(defmethod succeed! :mock [context & [arg]]
+  (channel-result context arg))
+
+(defmethod done! :default [{:keys [handle]} & [bad good]]
   (.done handle (clj->js bad) (clj->js good)))
+(defmethod done! :mock [context & [bad good]]
+  (channel-result context (or bad good)))
 
-(defn context->map [js-context]
-  {:handle          js-context
-   :aws-request-id  (aget js-context "awsRequestId")
-   :client-context  (aget js-context "clientContext")
-   :log-group-name  (aget js-context "logGroupName")
-   :log-stream-name (aget js-context "logStreamName")
-   :function-name   (aget js-context "functionName")})
+(defmethod msecs-remaining :default [{:keys [handle]}]
+  (.getRemainingTimeInMillis handle))
+(defmethod msecs-remaining :mock [_]
+  -1)
+
+(def context-keys
+  {:aws-request-id  "awsRequestId"
+   :client-context  "clientContext"
+   :log-group-name  "logGroupName"
+   :log-stream-name "logStreamName"
+   :function-name   "functionName"})
+
+(defmulti context->map context-dispatch)
+
+(defmethod context->map :default [js-context]
+  (into {:handle js-context}
+    (for [[us them] context-keys]
+      [us (aget js-context them)])))
+(defmethod context->map :mock [context-map] context-map)
+
+(defn mock-context [& [m]]
+  (-> (merge context-keys m)
+      (set/rename-keys context-keys)
+      (assoc
+        :cljs-lambda/resp-chan (async/chan 1)
+        :cljs-lambda/context-type :mock)))
 
 (defn wrap-lambda-fn [f]
   (fn [event context]
@@ -35,7 +72,11 @@
   (wrap-lambda-fn
    (fn [event context]
      (go
-       (let [result (<! (f event context))]
+       (let [result
+             (try
+               (<! (f event context))
+               (catch js/Error e
+                 e))]
          (if (instance? js/Error result)
            (fail!    context result)
            (succeed! context result)))))))
