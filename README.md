@@ -7,11 +7,22 @@ via [AWS Lambda](http://aws.amazon.com/documentation/lambda/).
  - Specify execution roles and resource limits in project definition
  - Use [core.async](https://github.com/clojure/core.async) for deferred completion
  - Smaller zip files with `:optimizations` `:advanced` support
- - [Blog post/tutorial](https://nervous.io/clojure/clojurescript/aws/lambda/node/lein/2015/07/05/lambda/)
+ - [Blog post/tutorial](https://nervous.io/clojure/clojurescript/aws/lambda/node/lein/2015/07/05/lambda/) (and [another](https://nervous.io/clojure/clojurescript/node/aws/2015/08/09/chemtrails/))
+
+N.B. If using advanced compilation alongside Node's standard library,
+something like
+[cljs-nodejs-externs](https://github.com/nervous-systems/cljs-nodejs-externs)
+will be required
 
 # Examples
 
 ## Get Started
+
+Using this project will require a recent [Node](https://nodejs.org/) runtime,
+and a properly-configured (`aws configure`) [AWS
+CLI](https://github.com/aws/aws-cli) installation **>= 1.7.31**.  Please run
+`pip install --upgrade awscli` if you're using an older version (`aws
+--version`).
 
 ```sh
 $ lein new cljs-lambda my-lambda-project
@@ -20,15 +31,13 @@ $ lein cljs-lambda default-iam-role
 $ lein cljs-lambda deploy
 $ lein cljs-lambda invoke work-magic '{"variety": "black"}'
 ```
-
-The above requires a recent [Node](https://nodejs.org/) runtime, and a properly-configured (`aws configure`) [AWS CLI](https://github.com/aws/aws-cli) installation **>= 1.7.31**.  Please run `pip install --upgrade awscli` if you're using an older version (`aws --version`).
-
 Or, put:
 
 [![Clojars
 Project](http://clojars.org/io.nervous/lein-cljs-lambda/latest-version.svg)](http://clojars.org/io.nervous/lein-cljs-lambda)
 
 In your Clojurescript project's `:plugins` vector.
+
 
 ## A Simple Function
 
@@ -40,13 +49,50 @@ In your Clojurescript project's `:plugins` vector.
   (async-lambda-fn
    (fn [{meow-target :name} context]
      (go
-       (<! (async/timeout 1000))
+       (<! (async/timeout 1000)) ;; Act like we're doing something
        {:from "the-cat"
         :to meow-target
         :message "I'm  meowing at you"}))))
 ```
 
 [And its associated project.clj](https://github.com/nervous-systems/cljs-lambda/blob/master/example/project.clj)
+
+## AWS Integration with [eulalie](https://github.com/nervous-systems/eulalie)
+
+This function retrieves the name it was invoked under then attempts to invoke
+itself in order to recursively compute the factorial of its input:
+
+```clojure
+(require '[eulalie.lambda.util :as lambda])
+(require '[eulalie.creds :as creds])
+
+(def ^:export fac
+  (async-lambda-fn
+   (fn [n {fac :function-name}]
+     (go
+       (if (<= n 1)
+         n
+         (let [[tag result] (<! (lambda/request! (creds/env) fac (dec n)))]
+           (* n result)))))))
+```
+
+See the
+[eulalie.lambda.util](https://github.com/nervous-systems/eulalie/wiki/eulalie.lambda.util)
+documentation for further details.
+
+N.B. Functions interacting with AWS will require execution under roles with the
+appropriate permissions, and will not execute under the placeholder IAM role
+created by the plugin's `default-iam-role` task.
+
+## Further Examples
+
+Using SNS & SQS from Clojurescript Lambda functions is covered in [this working
+example](https://github.com/nervous-systems/chemtrack-example/blob/master/lambda/chemtrack/lambda.cljs),
+and the [blog
+post](https://nervous.io/clojure/clojurescript/node/aws/2015/08/09/chemtrails/)
+which discusses it.  The [project file](
+https://github.com/nervous-systems/chemtrack-example/blob/master/project.clj)
+should serve as a reasonable guide for deployment.
 
 # The Plugin
 
