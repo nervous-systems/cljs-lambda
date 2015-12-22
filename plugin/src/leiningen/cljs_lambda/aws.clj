@@ -93,9 +93,10 @@
                      {:function-name fn-name
                       :payload payload
                       :log-type "Tail"
-                      :query "LogResult"}
+                      :query "LogResult"
+                      :output "text"}
                      (assoc global-opts :positional [out-path]))]
-    (println (base64/decode (read-string logs)))
+    (println (base64/decode (str/trim logs)))
     (let [output (slurp out-path)]
       (clojure.pprint/pprint
        (try
