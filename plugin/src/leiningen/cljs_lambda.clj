@@ -59,9 +59,8 @@
 
 (defn build
   "Write a zip file suitable for Lambda deployment"
-  [{{:keys [cljs-build cljs-build-id functions]} :cljs-lambda
+  [{{:keys [cljs-build cljs-build-id functions resource-dirs]} :cljs-lambda
     :as project}]
-
   (npm/npm project "install")
   (cljsbuild/cljsbuild project "once" (:id cljs-build))
   (let [{{:keys [output-dir optimizations] :as compiler} :compiler} cljs-build
@@ -73,6 +72,7 @@
      compiler
      {:project-name project-name
       :index-path index-path
+      :resource-dirs resource-dirs
       :zip-name (str project-name ".zip")})))
 
 (defn deploy

@@ -20,6 +20,13 @@
                (not= (extension file) "zip"))
       (zip-entry zip-stream file))))
 
+(defn- zip-resources [zip-stream dir]
+  (let [prefix (.getAbsolutePath dir)]
+    (doseq [file (rest (file-seq dir))]
+      (let [path (subs (.getAbsolutePath file) (inc (count prefix)))]
+        (when-not (.isDirectory file)
+          (zip-entry zip-stream file path))))))
+
 (defmulti  stuff-zip (fn [_ {:keys [optimizations]} _] optimizations))
 (defmethod stuff-zip :default [zip-stream {:keys [output-dir]} {:keys [index-path]}]
   (zip-entry zip-stream (io/file index-path) "index.js")
@@ -32,12 +39,14 @@
   (zip-below zip-stream (io/file "node_modules")))
 
 (defn write-zip [{:keys [output-dir] :as compiler-opts}
-                 {:keys [project-name zip-name] :as spec}]
+                 {:keys [project-name zip-name resource-dirs] :as spec}]
   (let [zip-file (io/file output-dir zip-name)
         path (.getAbsolutePath zip-file)]
     (println "Writing zip to" path)
     (.delete zip-file)
     (let [zip-stream (ZipOutputStream. (io/output-stream zip-file))]
       (stuff-zip zip-stream compiler-opts spec)
+      (doseq [d resource-dirs]
+        (zip-resources zip-stream (io/file d)))
       (.close zip-stream)
       path)))
