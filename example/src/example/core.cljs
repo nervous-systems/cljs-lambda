@@ -1,4 +1,4 @@
-(ns {{name}}.core
+(ns example.core
   (:require [cljs-lambda.util :as lambda :refer [async-lambda-fn]]
             [cljs.reader :refer [read-string]]
             [cljs.nodejs :as nodejs]

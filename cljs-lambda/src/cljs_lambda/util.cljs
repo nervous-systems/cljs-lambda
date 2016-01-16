@@ -1,12 +1,13 @@
 (ns cljs-lambda.util
   (:require [cljs.nodejs :as nodejs]
             [cljs.core.async :as async :refer [<! >!]]
+            [cljs.core.async.impl.protocols :as async-p]
             [clojure.set :as set])
   (:require-macros [cljs.core.async.macros :refer [go]]))
 
 (nodejs/enable-util-print!)
 
-(defn- context-dispatch [{:keys [cljs-lambda/context-type]} & [arg]]
+(defn- context-dispatch [{:keys [cljs-lambda/context-type]} & _]
   context-type)
 
 (defn- channel-result [{:keys [cljs-lambda/resp-chan]} & [arg]]
@@ -24,22 +25,22 @@
 (defmethod fail! :default [{:keys [handle]} & [arg]]
   (.fail handle (clj->js arg)))
 (defmethod fail! :mock [context & [arg]]
-  (channel-result context arg))
+  (channel-result context [:fail arg]))
 
 (defmethod succeed! :default [{:keys [handle]} & [arg]]
   (.succeed handle (clj->js arg)))
 (defmethod succeed! :mock [context & [arg]]
-  (channel-result context arg))
+  (channel-result context [:succeed arg]))
 
 (defmethod done! :default [{:keys [handle]} & [bad good]]
   (.done handle (clj->js bad) (clj->js good)))
 (defmethod done! :mock [context & [bad good]]
-  (channel-result context (or bad good)))
+  (channel-result context (if bad [:fail bad] [:succeed good])))
 
 (defmethod msecs-remaining :default [{:keys [handle]}]
   (.getRemainingTimeInMillis handle))
-(defmethod msecs-remaining :mock [_]
-  -1)
+(defmethod msecs-remaining :mock [{:keys [cljs-lambda/msecs-remaining]}]
+  (or (and msecs-remaining (msecs-remaining)) -1))
 
 (def context-keys
   {:aws-request-id  "awsRequestId"
@@ -71,12 +72,13 @@
 (defn async-lambda-fn [f]
   (wrap-lambda-fn
    (fn [event context]
-     (go
-       (let [result
-             (try
-               (<! (f event context))
-               (catch js/Error e
-                 e))]
-         (if (instance? js/Error result)
-           (fail!    context result)
-           (succeed! context result)))))))
+     (let [ch (go
+                (let [result (try
+                               (f event context)
+                               (catch js/Error e e))
+                      result (cond-> result
+                               (satisfies? async-p/ReadPort result) <!)]
+                  (if (instance? js/Error result)
+                    (fail!    context result)
+                    (succeed! context result))))]
+       (get context :cljs-lambda/resp-chan ch)))))

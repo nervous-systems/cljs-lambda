@@ -21,7 +21,7 @@
       (zip-entry zip-stream file))))
 
 (defn- zip-resources [zip-stream dir]
-  (let [prefix (.getAbsolutePath dir)]
+  (let [prefix (.. (io/file (.getAbsolutePath dir)) getParentFile getAbsolutePath)]
     (doseq [file (rest (file-seq dir))]
       (let [path (subs (.getAbsolutePath file) (inc (count prefix)))]
         (when-not (.isDirectory file)

@@ -10,6 +10,11 @@
               :sanitized (name-to-path name)}]
     (main/info "Generating fresh 'lein new' cljs-lambda project.")
     (->files data
-             ["project.clj"                 (render "project.clj" data)]
-             ["src/{{sanitized}}/core.cljs" (render "core.cljs"   data)]
-             [".gitignore"                  (render "gitignore"   data)])))
+             ["project.clj"                       (render "project.clj" data)]
+             ["README.md"                         (render "README.md" data)]
+             ["src/{{sanitized}}/core.cljs"       (render "core.cljs"   data)]
+             ["test/{{sanitized}}/core_test.cljs" (render "core_test.cljs" data)]
+             ["static/config.edn"                 (render "config.edn"  data)]
+             [".gitignore"                        (render "gitignore"   data)]
+
+             ["test/{{sanitized}}/test_runner.cljs" (render "test_runner.cljs" data)])))
