@@ -39,7 +39,7 @@
 (def default-defaults {:create true})
 
 (defn- augment-project
-  [{{:keys [defaults functions cljs-build-id aws-profile]} :cljs-lambda
+  [{{:keys [defaults functions cljs-build-id aws-profile region]} :cljs-lambda
     :as project}]
   (let [{:keys [builds]} (cljsbuild.config/extract-options project)
         [build] (if-not cljs-build-id
@@ -50,6 +50,7 @@
       (-> project
           (assoc-in [:cljs-lambda :cljs-build] build)
           (assoc-in [:cljs-lambda :global-aws-opts :aws-profile] aws-profile)
+          (assoc-in [:cljs-lambda :global-aws-opts :region] region)
           (assoc-in [:cljs-lambda :functions]
                     (map (fn [m]
                            (assoc
@@ -89,8 +90,8 @@
 
 (defn invoke
   "Invoke the named Lambda function"
-  [{{:keys [global-aws-opts]} :cljs-lambda} fn-name & [payload]]
-  (aws/invoke! fn-name payload global-aws-opts))
+  [{{:keys [global-aws-opts]} :cljs-lambda} fn-name & [payload region]]
+  (aws/invoke! fn-name payload region global-aws-opts))
 
 (defn default-iam-role
   "Install a Lambda-compatible IAM role, and stick it in project.clj"
