@@ -9,8 +9,10 @@
 
 (defn abs-path [^File f] (.getAbsolutePath f))
 
-(defn merge-global-opts [{:keys [aws-profile] :as global-opts} command-opts]
-  (cond-> command-opts aws-profile (assoc :profile (name aws-profile))))
+(defn merge-global-opts [{:keys [aws-profile region] :as global-opts} command-opts]
+  (cond-> command-opts
+    region (assoc :region (name region))
+    aws-profile (assoc :profile (name aws-profile))))
 
 (defn aws-cli! [service cmd longopts &
                 [{:keys [fatal positional] :or {fatal true}
@@ -45,13 +47,13 @@
       :exit
       zero?))
 
-(defn update-function-config! [fn-spec global-opts]
+(defn update-function-config! [{:keys [region] :as fn-spec} global-opts]
   (lambda-cli!
    :update-function-configuration
    (select-keys fn-spec
                 #{:name :role :handler :description
                   :timeout :memory-size})
-   global-opts))
+   (cond-> global-opts region (assoc :region region))))
 
 (defn update-function-code! [{:keys [name]} zip-path global-opts]
   (lambda-cli!
@@ -66,11 +68,10 @@
         create (create-function! fn-spec zip-path global-opts)
         :else (leiningen.core.main/abort
                "Function" fn-name "doesn't exist & :create not set"))
-
   (update-function-config! fn-spec global-opts))
 
 (defn deploy!
-  [zip-path {:keys [functions aws-profile global-aws-opts] :as cljs-lambda} & [fns]]
+  [zip-path {:keys [functions global-aws-opts] :as cljs-lambda} & [fns]]
   (let [functions (filter (fn [{:keys [name]}]
                             (or (empty? fns) (fns name))) functions)]
     (doseq [{:keys [name handler] :as fn-spec} functions]
@@ -87,9 +88,12 @@
       (leiningen.core.main/abort fn-name "doesn't exist & can't create"))
     (update-function-config! fn-spec global-aws-opts)))
 
-(defn invoke! [fn-name payload global-opts]
+(defn invoke! [fn-name payload region global-opts]
   (let [out-file (File/createTempFile "lambda-output" ".json")
         out-path (abs-path out-file)
+        global-opts (-> global-opts
+                        (assoc :positional [out-path])
+                        (cond-> region (assoc :region region)))
         {logs :out} (lambda-cli!
                      :invoke
                      {:function-name fn-name
@@ -97,7 +101,7 @@
                       :log-type "Tail"
                       :query "LogResult"
                       :output "text"}
-                     (assoc global-opts :positional [out-path]))]
+                     global-opts)]
     (println (base64/decode (str/trim logs)))
     (let [output (slurp out-path)]
       (clojure.pprint/pprint
