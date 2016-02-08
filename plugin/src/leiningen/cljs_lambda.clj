@@ -21,13 +21,13 @@
     (clostache.parser/render
      template
      (assoc compiler-opts
-            :module
-            (for [[ns fns] (group-by namespace (map :invoke fns))]
-              {:name (munge ns)
-               :function (for [f fns]
-                           ;; This is Clojure's munge, which isn't always going to be right
-                           {:export  (export-name f)
-                            :js-name (str (munge ns) "." (munge (name f)))})})))))
+       :module
+       (for [[ns fns] (group-by namespace (map :invoke fns))]
+         {:name (munge ns)
+          :function (for [f fns]
+                      ;; This is Clojure's munge, which isn't always going to be right
+                      {:export  (export-name f)
+                       :js-name (str (munge ns) "." (munge (name f)))})})))))
 
 (defn- write-index [output-dir s]
   (let [file (io/file output-dir "index.js")]
@@ -38,25 +38,60 @@
 
 (def default-defaults {:create true})
 
-(defn- augment-project
-  [{{:keys [defaults functions cljs-build-id aws-profile region]} :cljs-lambda
-    :as project}]
+(defn- extract-build [{{:keys [cljs-build-id]} :cljs-lambda :as project}]
   (let [{:keys [builds]} (cljsbuild.config/extract-options project)
         [build] (if-not cljs-build-id
                   builds
                   (filter #(= (:id %) cljs-build-id) builds))]
     (if-not build
       (leiningen.core.main/abort "Can't find cljsbuild build")
-      (-> project
-          (assoc-in [:cljs-lambda :cljs-build] build)
-          (assoc-in [:cljs-lambda :global-aws-opts :aws-profile] aws-profile)
-          (assoc-in [:cljs-lambda :global-aws-opts :region] region)
-          (assoc-in [:cljs-lambda :functions]
-                    (map (fn [m]
-                           (assoc
-                            (merge default-defaults defaults m)
-                            :handler (str "index." (export-name (:invoke m)))))
-                         functions))))))
+      build)))
+
+(defn- augment-fn [{:keys [defaults]} cli-kws fn-spec]
+  (assoc
+    (merge default-defaults defaults fn-spec cli-kws)
+    :handler (str "index." (export-name (:invoke fn-spec)))))
+
+(defn- augment-fns [cljs-lambda keep-fns cli-kws]
+  (let [keep-fns (into #{} keep-fns)
+        fn-pred  (if (empty? keep-fns)
+                   (constantly true)
+                   #(keep-fns (:name %)))]
+    (->> cljs-lambda
+         :functions
+         (filter fn-pred)
+         (map #(augment-fn cljs-lambda cli-kws %)))))
+
+(defn- augment-project
+  [{:keys [cljs-lambda] :as project} function-names cli-kws]
+  (let [build (extract-build project)
+        global-opts (select-keys
+                     (merge cljs-lambda cli-kws)
+                     #{:region :aws-profile})]
+    (assoc project
+      :cljs-lambda
+      (assoc cljs-lambda
+        :cljs-build build
+        :global-aws-opts global-opts
+        :positional-args function-names
+        :keyword-args cli-kws
+        :functions (augment-fns cljs-lambda function-names cli-kws)))))
+
+(let [coercions
+      {:create  #(Boolean/parseBoolean %)
+       :timeout #(Integer/parseInt %)
+       :memory-size #(Integer/parseInt %)}]
+
+  (defn- split-args [l]
+    (loop [pos [] kw {} [k & l] l]
+      (cond
+        (not k) [pos kw]
+        (not= \: (first k)) (recur (conj pos k) kw l)
+        :else
+        (let [[v & l] l
+              k      (keyword (subs k 1))
+              coerce (coercions k identity)]
+          (recur pos (assoc kw k (coerce v)) l))))))
 
 (defn build
   "Write a zip file suitable for Lambda deployment"
@@ -78,10 +113,10 @@
 
 (defn deploy
   "Build & deploy a zip file to Lambda, exposing the specified functions"
-  [{:keys [cljsbuild cljs-lambda] :as project} & fns]
+  [{:keys [cljsbuild cljs-lambda] :as project}]
   (let [zip-path (build project)
         {{:keys [output-dir output-to]} :compiler} cljsbuild]
-    (aws/deploy! zip-path cljs-lambda (into #{} fns))))
+    (aws/deploy! zip-path cljs-lambda)))
 
 (defn update-config
   "Write function configs from project.clj to Lambda"
@@ -90,8 +125,9 @@
 
 (defn invoke
   "Invoke the named Lambda function"
-  [{{:keys [global-aws-opts]} :cljs-lambda} fn-name & [payload region]]
-  (aws/invoke! fn-name payload region global-aws-opts))
+  [{{:keys [global-aws-opts positional-args]} :cljs-lambda}]
+  (let [[fn-name payload] positional-args]
+    (aws/invoke! fn-name payload global-aws-opts)))
 
 (defn default-iam-role
   "Install a Lambda-compatible IAM role, and stick it in project.clj"
@@ -103,8 +139,7 @@
              global-aws-opts)]
     (println "Using role" arn)
     (change/change project [:cljs-lambda :defaults]
-                   (fn [m & _]
-                     (assoc m :role arn)))))
+                   (fn [m & _] (assoc m :role arn)))))
 
 (defn cljs-lambda
   "Build & deploy AWS Lambda functions"
@@ -119,5 +154,6 @@
                          "invoke" invoke
                          "default-iam-role" default-iam-role
                          "update-config"    update-config} subtask)]
-     (apply subtask-fn (augment-project project) args)
+     (let [project (apply augment-project project (split-args args))]
+       (subtask-fn project))
      (println (leiningen.help/help-for cljs-lambda)))))

@@ -9,26 +9,27 @@
 
 (defn abs-path [^File f] (.getAbsolutePath f))
 
-(defn merge-global-opts [{:keys [aws-profile region] :as global-opts} command-opts]
+(defn merge-global-opts
+  [{:keys [aws-profile region] :as global-opts} command-opts]
   (cond-> command-opts
-    region (assoc :region (name region))
+    region      (assoc :region  (name region))
     aws-profile (assoc :profile (name aws-profile))))
 
-(defn aws-cli! [service cmd longopts &
-                [{:keys [fatal positional] :or {fatal true}
-                  :as global-opts}]]
-  (let [longopts (merge-global-opts global-opts longopts)
+(defn ->cli-args [m global-opts & [positional]]
+  (let [m    (merge-global-opts global-opts m)
         args (flatten
-              (for [[k v] (set/rename-keys longopts {:name :function-name})]
+              (for [[k v] (set/rename-keys m {:name :function-name})]
                 [(str "--" (name k))
-                 (if (keyword? v) (name v) (str v))]))
-        args (cond->> args positional (into positional))]
-    (apply println "aws" service (name cmd) args)
-    (let [{:keys [exit err] :as r}
-          (apply shell/sh "aws" service (name cmd) args)]
-      (if (and fatal (not (zero? exit)))
-        (leiningen.core.main/abort err)
-        r))))
+                 (if (keyword? v) (name v) (str v))]))]
+    (cond->> args positional (into positional))))
+
+(defn aws-cli! [service cmd args & [{:keys [fatal?] :or {fatal? true}}]]
+  (apply println "aws" service (name cmd) args)
+  (let [{:keys [exit err] :as r}
+        (apply shell/sh "aws" service (name cmd) args)]
+    (if (and fatal? (not (zero? exit)))
+      (leiningen.core.main/abort err)
+      r)))
 
 (def lambda-cli! (partial aws-cli! "lambda"))
 
@@ -37,29 +38,28 @@
    :create-function
    (-> fn-spec
        (select-keys #{:name :role :handler})
-       (assoc :runtime "nodejs" :zip-file zip-path))
-   global-opts))
+       (assoc :runtime "nodejs" :zip-file zip-path)
+       (->cli-args global-opts))))
 
 (defn function-exists? [fn-name global-opts]
-  (-> (lambda-cli! :get-function
-                   {:function-name fn-name}
-                   (assoc global-opts :fatal false))
+  (-> (lambda-cli!
+       :get-function
+       (->cli-args {:function-name fn-name} global-opts)
+       {:fatal? false})
       :exit
       zero?))
 
-(defn update-function-config! [{:keys [region] :as fn-spec} global-opts]
+(defn update-function-config! [fn-spec global-opts]
   (lambda-cli!
    :update-function-configuration
-   (select-keys fn-spec
-                #{:name :role :handler :description
-                  :timeout :memory-size})
-   (cond-> global-opts region (assoc :region region))))
+   (-> fn-spec
+       (select-keys #{:name :role :handler :description :timeout :memory-size})
+       (->cli-args global-opts))))
 
 (defn update-function-code! [{:keys [name]} zip-path global-opts]
   (lambda-cli!
    :update-function-code
-   {:name name :zip-file zip-path}
-   global-opts))
+   (->cli-args {:name name :zip-file zip-path} global-opts)))
 
 (defn deploy-function!
   [zip-path {fn-name :name create :create :as fn-spec} global-opts]
@@ -70,11 +70,16 @@
                "Function" fn-name "doesn't exist & :create not set"))
   (update-function-config! fn-spec global-opts))
 
+(defn fn-global-opts [fn-region {:keys [global-aws-opts keyword-args]}]
+  ;; This is awkward - we want to override the global region with the
+  ;; function's :region, unless the region came from the command line
+  (cond-> global-aws-opts
+    (and fn-region (not (:region keyword-args))) (assoc :region fn-region)))
+
 (defn deploy!
-  [zip-path {:keys [functions global-aws-opts] :as cljs-lambda} & [fns]]
-  (let [functions (filter (fn [{:keys [name]}]
-                            (or (empty? fns) (fns name))) functions)]
-    (doseq [{:keys [name handler] :as fn-spec} functions]
+  [zip-path {:keys [functions keyword-args global-aws-opts] :as cljs-lambda}]
+  (doseq [{:keys [name handler region] :as fn-spec} functions]
+    (let [global-aws-opts (fn-global-opts region cljs-lambda)]
       (println "Registering handler" handler "for function" name)
       (deploy-function!
        (str "fileb://" zip-path)
@@ -83,25 +88,25 @@
 
 (defn update-configs!
   [{:keys [functions aws-profile global-aws-opts] :as cljs-lambda}]
-  (doseq [{fn-name :name :as fn-spec} functions]
-    (when-not (function-exists? fn-name global-aws-opts)
-      (leiningen.core.main/abort fn-name "doesn't exist & can't create"))
-    (update-function-config! fn-spec global-aws-opts)))
+  (doseq [{fn-name :name region :region :as fn-spec} functions]
+    (let [global-aws-opts (fn-global-opts region cljs-lambda)]
+     (when-not (function-exists? fn-name global-aws-opts)
+       (leiningen.core.main/abort fn-name "doesn't exist & can't create"))
+     (update-function-config! fn-spec global-aws-opts))))
 
-(defn invoke! [fn-name payload region global-opts]
-  (let [out-file (File/createTempFile "lambda-output" ".json")
-        out-path (abs-path out-file)
-        global-opts (-> global-opts
-                        (assoc :positional [out-path])
-                        (cond-> region (assoc :region region)))
+(defn invoke! [fn-name payload global-opts]
+  (let [out-file    (File/createTempFile "lambda-output" ".json")
+        out-path    (abs-path out-file)
         {logs :out} (lambda-cli!
                      :invoke
-                     {:function-name fn-name
-                      :payload payload
-                      :log-type "Tail"
-                      :query "LogResult"
-                      :output "text"}
-                     global-opts)]
+                     (->cli-args
+                      {:function-name fn-name
+                       :payload payload
+                       :log-type "Tail"
+                       :query "LogResult"
+                       :output "text"}
+                      global-opts
+                      [out-path]))]
     (println (base64/decode (str/trim logs)))
     (let [output (slurp out-path)]
       (clojure.pprint/pprint
@@ -114,32 +119,35 @@
   (let [{:keys [exit out]}
         (aws-cli!
          "iam" "get-role"
-         {:role-name role-name
-          :output "text"
-          :query "Role.Arn"}
-         (assoc global-opts :fatal false))]
+         (->cli-args
+          {:role-name role-name
+           :output "text"
+           :query "Role.Arn"}
+          global-opts)
+         {:fatal? false})]
     (when (zero? exit)
       (str/trim out))))
 
 (defn assume-role-policy-doc! [role-name file-path global-opts]
   (-> (aws-cli!
        "iam" "create-role"
-       {:role-name role-name
-        :assume-role-policy-document
-        (str "file://" file-path)
-        :output "text"
-        :query "Role.Arn"}
-       global-opts)
+       (->cli-args
+        {:role-name role-name
+         :assume-role-policy-document (str "file://" file-path)
+         :output "text"
+         :query "Role.Arn"}
+        global-opts))
       :out
       str/trim))
 
 (defn put-role-policy! [role-name file-path global-opts]
   (aws-cli!
    "iam" "put-role-policy"
-   {:role-name role-name
-    :policy-name role-name
-    :policy-document (str "file://" file-path)}
-   global-opts))
+   (->cli-args
+    {:role-name role-name
+     :policy-name role-name
+     :policy-document (str "file://" file-path)}
+    global-opts)))
 
 (defn install-iam-role! [role-name role policy global-opts]
   (if-let [role-arn (get-role-arn! role-name global-opts)]
