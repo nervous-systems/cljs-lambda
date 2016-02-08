@@ -77,10 +77,10 @@
 
 (defn deploy
   "Build & deploy a zip file to Lambda, exposing the specified functions"
-  [{:keys [cljsbuild cljs-lambda] :as project}]
+  [{:keys [cljsbuild cljs-lambda] :as project} & fns]
   (let [zip-path (build project)
         {{:keys [output-dir output-to]} :compiler} cljsbuild]
-    (aws/deploy! zip-path cljs-lambda)))
+    (aws/deploy! zip-path cljs-lambda (into #{} fns))))
 
 (defn update-config
   "Write function configs from project.clj to Lambda"
