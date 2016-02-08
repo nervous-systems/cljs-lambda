@@ -70,13 +70,15 @@
   (update-function-config! fn-spec global-opts))
 
 (defn deploy!
-  [zip-path {:keys [functions aws-profile global-aws-opts] :as cljs-lambda}]
-  (doseq [{:keys [name handler] :as fn-spec} functions]
-    (println "Registering handler" handler "for function" name)
-    (deploy-function!
-     (str "fileb://" zip-path)
-     fn-spec
-     global-aws-opts)))
+  [zip-path {:keys [functions aws-profile global-aws-opts] :as cljs-lambda} & [fns]]
+  (let [functions (filter (fn [{:keys [name]}]
+                            (or (empty? fns) (fns name))) functions)]
+    (doseq [{:keys [name handler] :as fn-spec} functions]
+      (println "Registering handler" handler "for function" name)
+      (deploy-function!
+       (str "fileb://" zip-path)
+       fn-spec
+       global-aws-opts))))
 
 (defn update-configs!
   [{:keys [functions aws-profile global-aws-opts] :as cljs-lambda}]
