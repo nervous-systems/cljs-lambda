@@ -24,5 +24,5 @@ $ lein cljs-lambda invoke work-magic ...
 lein doo node example-test
 ```
 
-Doo is provided to avoid including code to tell `cljs.test` to exit the Node
-process after a test run.
+Doo is provided to avoid including code to set the process exit code after a
+ test run.
