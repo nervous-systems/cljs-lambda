@@ -7,12 +7,15 @@ before_install:
 - sudo pip install awscli
 - nvm install 5
 - cd template && lein install && cd ..
-- lein new cljs-lambda test-project --snapshot
+- lein new cljs-lambda $PROJECT_DIR $SNAPSHOT
 - cd plugin && lein install && cd ..
-- cp -r travis/* test-project
-- cd test-project
+- cp -r travis/* $PROJECT_DIR
+- cd $PROJECT_DIR
 script: ./run.sh
 env:
+  matrix:
+  - PROJECT_DIR=test-project-snapshot SNAPSHOT=--snapshot
+  - PROJECT_DIR=test-project
   global:
   - secure: ZVlc+CjkFGhVwI8lU3rhpCYjK5y77yWwnPH+wVPJi5nQJJTFBGBny96xodTDiotgBLG6S26y2JhlAPRRjYQ3JyHT2/PRUDKucgD0Kbdr8JOzaTauaiv9LnFIANuJxVW4oWePTc5geqnoleTnb1/0a9VtRNZNZs0rfAdcHjGd8HPyFtHL8rjV87ozi5ALJuszvPYvWLsWfVVJLkuFnyTE9BoIv55XI5DeG/C3giGTbTex5DksH+f9bhMriyN8ey5QgBmD5M+IsZ/x1KcyV2JmS7fZArI7YndYHFGaIQT/SC3Yu6gjBLoVEtMfFWW85wXBoxwSUb+cF+Hy3vat4JuiqbkVtuX17cWl3gMCvTYavIiTLbfiw11JXArGyYzuyurwvif070x5LS5Dvneo7DyLs2FcryJt8hKhyrltGVIPTBm1zXMHqYhmYVnbMwMVv3lcc/N/up1Itbca/3mwA5hUjpWiZ47tNPMgxk7HyRy3NNFaNZ6zqX8OooyQPYwcFMOXbTCvi8g9dU1+qblVjqmERJlfqxxdceTsdRKHPWUtQh24MRA7TKNmege9PZelF0nbfJm+aW8j5HXMUQuRZ07I8lBilC0viP0lNPNrHuNeLrXXbKdHHYbTUhvj13fOVvVswRzrVr3BIPEEG+3O73RBoMh2uwYt4ry2Bq7OzFoClI4=
   - secure: MifrTEJbK6bjusi6hBv50EJi6qlcIFoszI1ITQi3clq3QGygc7zyF3oCwGBq4xIJMRfEtQGXQ20wkv5wJ7lzXSTEtuWgSsxYBnUkGHAyrW/JlV8Kw1cWet4wgIVF3eg1zUPCxAzQZ2dDJZKSOKHSx9BA0WBFI2no98NHIleiR2voOv0Kl04pzlq/rv/1mdNEgNnKhVxLPckM0Ygc+9V+MUsZ66InvfVMeYL+nYWk3Levu92DFyJq/evJOaWoQywNbFw9FWkOYKYNa7kksVd0CK7M/ELFZPuyEgUfQ7S6qnLF52KabiXa3UeJgNp5d9lgLkUsYgxZFPWO0lMOhtMDhmFkn1NVQDcWp6G91iZowFBJ5+nBkUlaAOSqy/J3PhfiNkOVfsRkL3ZIRMZ17jRfNdOVI+mydlP1YCqRFov+XGQfiilaG9q2mToQlQGP+NkGzTRWPavKOXLPZ5BBpDfF80USeaReoUS5ShMqpA2b9a3249kxJjjYWNdDuffGgF+kzRZTS+4sIyH6SHU96sieuMEWDafnCRmCnMXjz3pvHQOWepBJedryN1kVEKGxJyZn9EjHIiXOmSZwt/N5vee5i/EJjfIflJG4WypTHeR0ZKetx3fmGZrzRF+g6Mmy3ONgKZA8l15QJ2IB+hxhPIMZ9zABBHsQxZqHlHsS4JJ2UDE=
