@@ -13,7 +13,7 @@
 (defn- export-name [sym]
   (str/replace (munge sym) #"\." "_"))
 
-(defn- generate-index [{:keys [optimizations] :as compiler-opts} fns]
+(defn- generate-index [{optimizations :optimizations :as compiler-opts} fns]
   (let [template (slurp (io/resource
                          (if (= optimizations :advanced)
                            "index-advanced.mustache"
@@ -32,25 +32,23 @@
 (defn- write-index [output-dir s]
   (let [file (io/file output-dir "index.js")]
     (println "Writing index to" (.getAbsolutePath file))
-    (with-open [w (io/writer file)]
-      (.write w s))
+    (spit f s)
     (.getPath file)))
 
-(def default-defaults {:create true})
+(defn- extract-build [project]
+  (if-let [build (->> project
+                      cljsbuild.config/extract-options
+                      :builds
+                      (filter #(or (not id) (= id (:id %))))
+                      first)]
+    build
+    (leiningen.core.main/abort "Can't find cljsbuild build")))
 
-(defn- extract-build [{{:keys [cljs-build-id]} :cljs-lambda :as project}]
-  (let [{:keys [builds]} (cljsbuild.config/extract-options project)
-        [build] (if-not cljs-build-id
-                  builds
-                  (filter #(= (:id %) cljs-build-id) builds))]
-    (if-not build
-      (leiningen.core.main/abort "Can't find cljsbuild build")
-      build)))
-
-(defn- augment-fn [{:keys [defaults]} cli-kws fn-spec]
-  (assoc
-    (merge default-defaults defaults fn-spec cli-kws)
-    :handler (str "index." (export-name (:invoke fn-spec)))))
+(let [default-defaults {:create true}]
+  (defn- augment-fn [{defaults :defaults} cli-kws fn-spec]
+    (assoc
+      (merge default-defaults defaults fn-spec cli-kws)
+      :handler (str "index." (export-name (:invoke fn-spec))))))
 
 (defn- augment-fns [cljs-lambda keep-fns cli-kws]
   (let [keep-fns (into #{} keep-fns)
@@ -63,7 +61,7 @@
          (map #(augment-fn cljs-lambda cli-kws %)))))
 
 (defn- augment-project
-  [{:keys [cljs-lambda] :as project} function-names cli-kws]
+  [{cljs-lambda :cljs-lambda :as project} function-names cli-kws]
   (let [build (extract-build project)
         global-opts (select-keys
                      (merge cljs-lambda cli-kws)
@@ -75,52 +73,49 @@
         :global-aws-opts global-opts
         :positional-args function-names
         :keyword-args cli-kws
-        :functions (augment-fns cljs-lambda function-names cli-kws)))))
+        :functions    (augment-fns cljs-lambda function-names cli-kws)))))
 
 (let [coercions
       {:create  #(Boolean/parseBoolean %)
        :timeout #(Integer/parseInt %)
        :memory-size #(Integer/parseInt %)}]
-
   (defn- split-args [l]
-    (loop [pos [] kw {} [k & l] l]
+    (loop [positional [] kw {} [k & l] l]
       (cond
-        (not k) [pos kw]
-        (not= \: (first k)) (recur (conj pos k) kw l)
+        (not k) [positional kw]
+        (not= \: (first k)) (recur (conj positional k) kw l)
         :else
         (let [[v & l] l
               k      (keyword (subs k 1))
               coerce (coercions k identity)]
-          (recur pos (assoc kw k (coerce v)) l))))))
+          (recur positional (assoc kw k (coerce v)) l))))))
 
 (defn build
   "Write a zip file suitable for Lambda deployment"
-  [{{:keys [cljs-build cljs-build-id functions resource-dirs]} :cljs-lambda
-    :as project}]
+  [{{:keys [cljs-build functions resource-dirs]} :cljs-lambda :as project}]
   (npm/npm project "install")
   (cljsbuild/cljsbuild project "once" (:id cljs-build))
-  (let [{{:keys [output-dir optimizations] :as compiler} :compiler} cljs-build
-        project-name (-> project :name name)
+
+  (let [{compiler :compiler} cljs-build
+        project-name (name (:name project))
         index-path   (->> functions
                           (generate-index compiler)
-                          (write-index output-dir))]
+                          (write-index (compiler :output-dir)))]
     (write-zip
      compiler
-     {:project-name project-name
-      :index-path index-path
+     {:project-name  project-name
+      :index-path    index-path
       :resource-dirs resource-dirs
-      :zip-name (str project-name ".zip")})))
+      :zip-name      (str project-name ".zip")})))
 
 (defn deploy
   "Build & deploy a zip file to Lambda, exposing the specified functions"
-  [{:keys [cljsbuild cljs-lambda] :as project}]
-  (let [zip-path (build project)
-        {{:keys [output-dir output-to]} :compiler} cljsbuild]
-    (aws/deploy! zip-path cljs-lambda)))
+  [{cljs-lambda :cljs-lambda :as project}]
+  (aws/deploy! (build project) cljs-lambda))
 
 (defn update-config
   "Write function configs from project.clj to Lambda"
-  [{:keys [cljs-lambda] :as project}]
+  [{cljs-lambda :cljs-lambda}]
   (aws/update-configs! cljs-lambda))
 
 (defn invoke
@@ -131,29 +126,32 @@
 
 (defn default-iam-role
   "Install a Lambda-compatible IAM role, and stick it in project.clj"
-  [{{:keys [global-aws-opts]} :cljs-lambda :as project}]
+  [{{global-aws-opts :global-aws-opts} :cljs-lambda :as project}]
   (let [arn (aws/install-iam-role!
              :cljs-lambda-default
              (slurp (io/resource "default-iam-role.json"))
              (slurp (io/resource "default-iam-policy.json"))
              global-aws-opts)]
     (println "Using role" arn)
-    (change/change project [:cljs-lambda :defaults]
-                   (fn [m & _] (assoc m :role arn)))))
+    (change/change
+     project
+     [:cljs-lambda :defaults]
+     (fn [m & _] (assoc m :role arn)))))
 
-(defn cljs-lambda
-  "Build & deploy AWS Lambda functions"
-  {:help-arglists '([build deploy update-config invoke default-iam-role])
-   :subtasks [#'build #'deploy #'update-config #'invoke #'default-iam-role]}
+(let [subtask->fn {"build"  build
+                   "deploy" deploy
+                   "invoke" invoke
+                   "default-iam-role" default-iam-role
+                   "update-config"    update-config}]
+  (defn cljs-lambda
+    "Build & deploy AWS Lambda functions"
+    {:help-arglists '([build deploy update-config invoke default-iam-role])
+     :subtasks [#'build #'deploy #'update-config #'invoke #'default-iam-role]}
 
-  ([project] (println (leiningen.help/help-for cljs-lambda)))
+    ([project] (println (leiningen.help/help-for cljs-lambda)))
 
-  ([project subtask & args]
-   (if-let [subtask-fn ({"build"  build
-                         "deploy" deploy
-                         "invoke" invoke
-                         "default-iam-role" default-iam-role
-                         "update-config"    update-config} subtask)]
-     (let [project (apply augment-project project (split-args args))]
-       (subtask-fn project))
-     (println (leiningen.help/help-for cljs-lambda)))))
+    ([project subtask & args]
+     (if-let [subtask-fn (subtask->fn subtask)]
+       (let [project (apply augment-project project (split-args args))]
+         (subtask-fn project))
+       (println (leiningen.help/help-for cljs-lambda))))))

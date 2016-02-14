@@ -44,7 +44,7 @@
 (defn function-exists? [fn-name global-opts]
   (-> (lambda-cli!
        :get-function
-       (->cli-args {:function-name fn-name} global-opts)
+       (->cli-args {:name fn-name} global-opts)
        {:fatal? false})
       :exit
       zero?))
@@ -94,35 +94,30 @@
        (leiningen.core.main/abort fn-name "doesn't exist & can't create"))
      (update-function-config! fn-spec global-aws-opts))))
 
-(defn invoke! [fn-name payload global-opts]
-  (let [out-file    (File/createTempFile "lambda-output" ".json")
-        out-path    (abs-path out-file)
-        {logs :out} (lambda-cli!
-                     :invoke
-                     (->cli-args
-                      {:function-name fn-name
-                       :payload payload
-                       :log-type "Tail"
-                       :query "LogResult"
-                       :output "text"}
-                      global-opts
-                      [out-path]))]
-    (println (base64/decode (str/trim logs)))
-    (let [output (slurp out-path)]
-      (clojure.pprint/pprint
-       (try
-         (json/parse-string output true)
-         (catch Exception e
-           [:not-json output]))))))
+(let [invoke-kwargs {:log-type "Tail" :query "LogResult" :output "text"}]
+ (defn invoke! [fn-name payload global-opts]
+   (let [out-file    (File/createTempFile "lambda-output" ".json")
+         out-path    (abs-path out-file)
+         {logs :out} (lambda-cli!
+                      :invoke
+                      (->cli-args
+                       (assoc invoke-kwargs :name fn-name :payload payload)
+                       global-opts
+                       [out-path]))]
+     (println (base64/decode (str/trim logs)))
+     (let [output (slurp out-path)]
+       (clojure.pprint/pprint
+        (try
+          (json/parse-string output true)
+          (catch Exception e
+            [:not-json output])))))))
 
 (defn get-role-arn! [role-name global-opts]
   (let [{:keys [exit out]}
         (aws-cli!
          "iam" "get-role"
          (->cli-args
-          {:role-name role-name
-           :output "text"
-           :query "Role.Arn"}
+          {:role-name role-name :output "text" :query "Role.Arn"}
           global-opts)
          {:fatal? false})]
     (when (zero? exit)
