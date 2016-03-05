@@ -1,5 +1,6 @@
 (ns leiningen.cljs-lambda.zip-tedium
-  (:require [clojure.java.io :as io])
+  (:require [leiningen.cljs-lambda.logging :refer [log]]
+            [clojure.java.io :as io])
   (:import [java.io File]
            [java.util.zip ZipEntry ZipOutputStream]))
 
@@ -14,7 +15,7 @@
       (subs path (inc i)))))
 
 (defn- zip-below [zip-stream dir]
-  (println "Adding files from" (.getAbsolutePath dir))
+  (log :verbose "Adding files from" (.getAbsolutePath dir))
   (doseq [file (file-seq dir)]
     (when (and (.isFile file)
                (not= (extension file) "zip"))
@@ -42,7 +43,7 @@
                  {:keys [project-name zip-name resource-dirs] :as spec}]
   (let [zip-file (io/file output-dir zip-name)
         path (.getAbsolutePath zip-file)]
-    (println "Writing zip to" path)
+    (log :verbose "Writing zip to" path)
     (.delete zip-file)
     (let [zip-stream (ZipOutputStream. (io/output-stream zip-file))]
       (stuff-zip zip-stream compiler-opts spec)

@@ -56,7 +56,6 @@ Project](http://clojars.org/io.nervous/lein-cljs-lambda/latest-version.svg)](htt
 {...
  :cljs-lambda
  {:cljs-build-id "cljs-lambda-example"
-  :aws-profile "XYZ"
   :defaults {:role "arn:aws:iam::151963828411:role/..."}
   :resource-dirs ["config"]
   :region ... ;; This'll default to your AWS CLI profile's region
@@ -67,9 +66,9 @@ Project](http://clojars.org/io.nervous/lein-cljs-lambda/latest-version.svg)](htt
     :invoke cljs-lambda-example.cat/meow}]}}
 ```
 
- - If `:aws-profile` is present, the value will be passed as `--profile` to all invocations of the AWS CLI, otherwise the CLI's default profile will be used
- - The top-level `:region` key will be used for e.g. `lein cljs-lambda invoke`, if a value isn't passed on the command line - and'll be used as the function default if no other region is specified for deployments.
- - `:resource-dirs` is a sequence of directories, each appearing at the top-level in the resulting zip-file
+The wiki's [plugin
+reference](https://github.com/nervous-systems/cljs-lambda/wiki/Plugin-Reference)
+has more details.
 
 # Brief Function Examples
 
@@ -136,29 +135,11 @@ and the [blog
 post](https://nervous.io/clojure/clojurescript/node/aws/2015/08/09/chemtrails/)
 which discusses it.
 
-# Deploying Functions w/ Plugin
-
-```sh
-# Deploy all functions in project file:
-$ lein cljs-lambda deploy
-
-# Deploy specific functions (these correspond to :function-name)
-$ lein cljs-lambda deploy fn-1 fn-2
-
-# Override project.clj values
-$ lein cljs-lambda deploy \
-  :region us-west-2 \
-  :aws-profile serious-deployment \
-  :memory-size 256
-
-$ lein cljs-lambda update-config fn-1 :timeout 60
-```
-
 # Function Configuration w/ Plugin
 
 The `:functions` vector within a `:cljs-lambda` map is comprised of maps, each
 describing a function which'll be deployed when `lein cljs-lambda deploy` is
-invoked.  An exhaustive example:
+invoked.  An example:
 
 ```clojure
 {:name "the-lambda-function-name"
@@ -172,14 +153,9 @@ invoked.  An exhaustive example:
  :memory-size 128} ;; MB
 ```
 
-- While `:role` is required, it (and any of the other keys) can be supplied as
-defaults via placing e.g. `:defaults {:role ...}` in the project's
-`:cljs-lambda` map.
-- A function's `:create` key, defaulting to `true`, determines whether a
-`create-function` Lambda command will be issued if an attempt is made to
-`deploy` a not-yet-existing Lambda function.
-- In general, all project-file options can be overridden from the CLI by appending
-the relevant keys/values (`... update-config :timeout 30` etc.)
+The wiki's [plugin
+reference](https://github.com/nervous-systems/cljs-lambda/wiki/Plugin-Reference)
+has more details.
 
 ## cljsbuild
 
