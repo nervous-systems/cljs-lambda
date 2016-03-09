@@ -17,6 +17,8 @@ deployment & invocation of Clojurescript Lambda functions
  - Use [core.async](https://github.com/clojure/core.async) for deferred completion
  - `:optimizations` `:advanced` support, for smaller zip files
  - Utilities for testing Lambda entrypoints off of EC2 ([see below](#testing))
+ - Parallel deployments
+ - Function publishing/versioning
  - [Blog post/tutorial](https://nervous.io/clojure/clojurescript/aws/lambda/node/lein/2015/07/05/lambda/) (and [another](https://nervous.io/clojure/clojurescript/node/aws/2015/08/09/chemtrails/))
 
 N.B. If using advanced compilation alongside Node's standard library,
