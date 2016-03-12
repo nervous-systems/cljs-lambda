@@ -15,6 +15,15 @@
 (defn- export-name [sym]
   (str/replace (munge sym) #"\." "_"))
 
+(defn- fns->module-template [fns]
+  (for [[ns fns] (group-by namespace (map :invoke fns))]
+    {:name (munge ns)
+     :function
+     (for [f fns]
+       ;; This is Clojure's munge, which isn't always going to be right
+       {:export  (export-name f)
+        :js-name (str (munge ns) "." (munge (name f)))})}))
+
 (defn- generate-index [{:keys [optimizations] :as compiler-opts} fns]
   (let [template (slurp (io/resource
                          (if (= optimizations :advanced)
@@ -22,15 +31,9 @@
                            "index.mustache")))]
     (clostache.parser/render
      template
-     (assoc compiler-opts
-       :module
-       (for [[ns fns] (group-by namespace (map :invoke fns))]
-         {:name (munge ns)
-          :function
-          (for [f fns]
-            ;; This is Clojure's munge, which isn't always going to be right
-            {:export  (export-name f)
-             :js-name (str (munge ns) "." (munge (name f)))})})))))
+     (-> compiler-opts
+         (update :source-map #(when % true))
+         (assoc :module (fns->module-template fns))))))
 
 (defn- write-index [output-dir s]
   (let [file (io/file output-dir "index.js")]
