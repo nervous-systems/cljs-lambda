@@ -1,3 +1,10 @@
+{{#source-map}}
+try {
+    require("source-map-support").install();
+} catch(err) {
+}
+{{/source-map}}
+
 require("./{{output-to}}");
 
 {{#module}}

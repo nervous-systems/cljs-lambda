@@ -1,0 +1,88 @@
+body {
+    font-family: "Merriweather", "PT Serif", Georgia, "Times New Roman", serif;
+}
+
+.attribution {
+  font-size: 60%;
+  padding: 8px;
+  text-align: center;
+}
+
+.sidebar, #content {
+  top: 8px;
+}
+
+#header {
+  display: none;
+}
+
+.src-link a {
+    background: none;
+    border: none;
+    font-size: 95%;
+    text-transform: capitalize;
+    color: #0096cc;
+    text-align: right;
+    display: block;
+}
+
+.namespace-docs > .anchor {
+    margin-top: 0;
+}
+
+h1, h2, h3, h4 {
+    font-family: Lato;
+    font-weight: normal;
+}
+
+.markdown pre, .markdown code, pre.deps {
+    background: none;
+    border: none;
+    font-size: inherit;
+}
+
+.markdown code {
+  margin: 0;
+}
+
+#header {
+    background: none;
+    box-shadow: none;
+    color: black;
+}
+
+#header a {
+    color: black;
+    text-shadow: none;
+}
+
+.project-name {
+    text-transform: lowercase;
+}
+
+.sidebar.primary, .sidebar.secondary {
+    background: none;
+    border: none;
+}
+
+.namespace-docs h3, .namespace a, code, pre {
+    font-family: "Droid Sans Mono", monospace;
+}
+
+.doc {
+    margin-bottom: 0px;
+}
+
+.public {
+    border: none;
+}
+
+
+a, a span {
+    color: #0096cc;
+    text-decoration: none;
+}
+
+.sidebar.secondary li.current a {
+    border-color: #0096cc;
+}

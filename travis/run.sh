@@ -21,14 +21,15 @@ if [ ! -z "$AWS_SECRET_ACCESS_KEY" ] ; then
 
   wait
   echo "Deploy into us-west-2"
-  lein cljs-lambda deploy work-magic :name $FN_NAME :region us-west-2 :quiet > /dev/null
+  lein cljs-lambda deploy work-magic :name $FN_NAME :region us-west-2 :quiet
 
   echo "Assert function doesn't exist in us-east-1"
-  (echo "! ./get-function.sh $FN_NAME"; echo "./get-function.sh $FN_NAME us-west-2") | parallel
+  (echo "! ./get-function.sh $FN_NAME";
+   echo "./get-function.sh $FN_NAME us-west-2") | parallel
 
   echo "Assert that we can invoke the function in us-west-2 and get stripped output"
   FN_OUT=$($INVOKE \
-             "{\"magic-word\": \"${PROJECT_DIR}-token\", \"spell\": \"delay\"}" \
+             "{\"magic-word\": \"${PROJECT_DIR}-token\", \"spell\": \"delay-promise\"}" \
              :region us-west-2 :quiet)
   if [[ $FN_OUT != \{:waited* ]]; then
     echo "Failed to retrieve invocation output $FN_OUT"
