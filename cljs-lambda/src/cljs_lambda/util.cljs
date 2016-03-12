@@ -60,11 +60,10 @@
   (let [resolve   #(do (async/put! result-chan [:resolve (js->clj %)]) result)
         reject    #(do (async/put! result-chan [:reject  (js->clj %)]) result)]
     (assoc ctx
-      :cljs-lambda/result result
       :handle
       #js {:fail    reject
            :succeed resolve
-           :done    #(if %1 (reject %1) (resolve (js->clj %2)))
+           :done    #(if %1 (reject %1) (resolve %2))
            :getRemainingTimeInMillis msecs-remaining})))
 
 (defn mock-context [& [m]]
