@@ -129,16 +129,35 @@
   (let [f (lambda/async-lambda-fn
            (constantly "Everything's OK")
            {:error-handler #(throw (js/Error. "Wilderness"))})]
-    (.then (f nil (lambda/mock-context))
-           #(is (= % "Everything's OK")))))
+    (.then
+     (f nil (lambda/mock-context))
+     #(is (= % "Everything's OK")))))
 
 (macros/deflambda def-wrappers-are-evil [event context]
   (lambda/done! context nil event))
 
 (deftest-async deflambda
   (let [event [1 2 "hello"]]
-    (.then (def-wrappers-are-evil event (lambda/mock-context))
-           #(is (= % event)))))
+    (.then
+     (def-wrappers-are-evil event (lambda/mock-context))
+     #(is (= % event)))))
 
 (deftest deflambda-exports
   (is (-> #'def-wrappers-are-evil meta :export)))
+
+(deftest-async msecs-remaining
+  (let [f (lambda/async-lambda-fn
+           (fn [_ ctx]
+             (lambda/msecs-remaining ctx)))]
+    (.then
+     (f nil (lambda/mock-context))
+     #(is (= % -1)))))
+
+(deftest-async msecs-remaining-supplied
+  (let [f (lambda/async-lambda-fn
+           (fn [_ ctx]
+             (lambda/msecs-remaining ctx)))]
+    (.then
+     (f nil (assoc (lambda/mock-context)
+              :cljs-lambda/msecs-remaining (constantly 77)))
+     #(is (= % 77)))))

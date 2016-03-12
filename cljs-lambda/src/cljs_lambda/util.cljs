@@ -55,7 +55,7 @@
   [{:keys [cljs-lambda/msecs-remaining
            cljs-lambda/result-chan
            cljs-lambda/result] :as ctx
-    :or {msecs-remaining (constantly -1)}}]
+    :or {cljs-lambda/msecs-remaining (constantly -1)}}]
   (let [resolve   #(do (async/put! result-chan [:resolve (js->clj %)]) result)
         reject    #(do (async/put! result-chan [:reject  (js->clj %)]) result)]
     (assoc ctx
