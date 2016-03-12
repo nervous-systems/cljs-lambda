@@ -2,41 +2,35 @@
   (:require [{{name}}.core :refer [work-magic config]]
             [cljs.test :refer-macros [deftest is]]
             [cljs-lambda.util :refer [mock-context]]
-            [cljs.core.async :as async])
-  (:require-macros [cljs.core.async.macros :refer [go]]))
+            [promesa.core :as p]))
+
+(defn with-promised-completion [f]
+  (cljs.test/async
+   done
+   (p/branch (f) done done)))
 
 (deftest wrong-word
-  (cljs.test/async
-   done
-   (go
-     (let [[tag result] (<! (work-magic
-                             {:magic-word "not the magic word"}
-                             (mock-context)))]
-       (is (= tag :fail))
-       (done)))))
+  (with-promised-completion
+    (fn []
+      (-> (work-magic {:magic-word "not the magic word"} (mock-context))
+          (p/then #(is false "Expected error"))))))
 
-(deftest delay-spell
-  (cljs.test/async
-   done
-   (go
-     (let [[tag result] (<! (work-magic
-                             {:magic-word (:magic-word config)
-                              :spell :delay
-                              :msecs 2}
-                             (mock-context)))]
-       (is (= tag :succeed))
-       (is (= result {:waited 2}))
-       (done)))))
+(deftest delay-channel-spell
+  (with-promised-completion
+    (fn []
+      (-> (work-magic
+           {:magic-word (:magic-word config)
+            :spell :delay-channel
+            :msecs 2}
+           (mock-context))
+          (p/branch #(is (= % {"waited" 2})) #(is false %))))))
 
-(deftest delayed-failure-spell
-  (cljs.test/async
-   done
-   (go
-     (let [[tag result] (<! (work-magic
-                             {:magic-word (:magic-word config)
-                              :spell :delayed-failure
-                              :msecs 3}
-                             (mock-context)))]
-       (is (= tag :fail))
-       (is (instance? js/Error result))
-       (done)))))
+(deftest delay-fail-spell
+  (with-promised-completion
+    (fn []
+      (-> (work-magic
+           {:magic-word (:magic-word config)
+            :spell :delay-fail
+            :msecs 3}
+           (mock-context))
+          (p/then #(is false "Expected error"))))))
