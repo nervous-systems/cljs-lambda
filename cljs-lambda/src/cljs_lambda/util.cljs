@@ -1,7 +1,8 @@
 (ns cljs-lambda.util
   (:require [cljs.nodejs :as nodejs]
             [cljs.core.async :as async :refer [<! >!]]
-            [cljs.core.async.impl.protocols :as async-p])
+            [cljs.core.async.impl.protocols :as async-p]
+            [promesa.core :as p])
   (:require-macros [cljs.core.async.macros :refer [go]]))
 
 (nodejs/enable-util-print!)
@@ -43,7 +44,7 @@
       [us (aget js-context them)])))
 
 (defn- chan->promise [ch]
-  (js/Promise.
+  (p/promise
    (fn [resolve reject]
      (go
        (let [[tag value] (<! ch)]
@@ -89,13 +90,13 @@
   (satisfies? async-p/ReadPort x))
 
 (defn- invoke-async [f & args]
-  (js/Promise.
+  (p/promise
    (fn [resolve reject]
      (let [handle #(if (instance? js/Error %) (reject %) (resolve %))]
        (try
          (let [result (apply f args)]
            (cond
-             (promise? result) (.then result resolve reject)
+             (promise? result) (p/branch result resolve reject)
              (chan?    result) (go (handle (<! result)))
              :else             (handle result)))
          (catch js/Error e
@@ -103,7 +104,7 @@
 
 (defn handle-errors [f error-handler]
   (fn [event context]
-    (.catch
+    (p/catch
      (invoke-async f event context)
      #(invoke-async error-handler % event context))))
 
@@ -112,5 +113,6 @@
     (wrap-lambda-fn
      (fn [event context]
        (-> (invoke-async f event context)
-           (.then (partial succeed! context)
-                  (partial fail!    context)))))))
+           (p/branch
+             (partial succeed! context)
+             (partial fail!    context)))))))

@@ -7,4 +7,3 @@
          (cljs-lambda.util/async-lambda-fn
           (fn ~bindings
             ~@body)))))
-

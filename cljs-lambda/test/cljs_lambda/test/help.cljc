@@ -7,11 +7,9 @@
          (let [result# (do ~@body)]
            (cljs.test/async
             done#
-            (.then  result# done#)
-            (.catch result#
-                    (fn [e#]
-                      (cljs.test/is (not e#))
-                      (done#))))))))
-
-
-
+            (promesa.core/branch
+             result#
+             done#
+             (fn [e#]
+               (cljs.test/is (not e#))
+               (done#))))))))

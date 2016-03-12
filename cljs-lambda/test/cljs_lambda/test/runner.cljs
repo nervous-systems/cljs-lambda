@@ -3,4 +3,3 @@
            [cljs-lambda.test.util]))
 
 (doo-tests 'cljs-lambda.test.util)
-
