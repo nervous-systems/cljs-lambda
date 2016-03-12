@@ -1,8 +1,7 @@
 (ns cljs-lambda.util
   (:require [cljs.nodejs :as nodejs]
             [cljs.core.async :as async :refer [<! >!]]
-            [cljs.core.async.impl.protocols :as async-p]
-            [clojure.set :as set])
+            [cljs.core.async.impl.protocols :as async-p])
   (:require-macros [cljs.core.async.macros :refer [go]]))
 
 (nodejs/enable-util-print!)
@@ -43,22 +42,38 @@
     (for [[us them] context-keys]
       [us (aget js-context them)])))
 
+(defn- chan->promise [ch]
+  (js/Promise.
+   (fn [resolve reject]
+     (go
+       (let [[tag value] (<! ch)]
+         (case tag
+           :resolve (resolve value)
+           :reject  (reject  value)))))))
+
 (defmethod context->map :mock
-  [{:keys [cljs-lambda/msecs-remaining] :as ctx
+  [{:keys [cljs-lambda/msecs-remaining
+           cljs-lambda/result-chan
+           cljs-lambda/result] :as ctx
     :or {msecs-remaining (constantly -1)}}]
-  (let [reject  #(.reject  js/Promise (js->clj %))
-        resolve #(.resolve js/Promise (js->clj %))]
+  (let [resolve   #(do (async/put! result-chan [:resolve (js->clj %)]) result)
+        reject    #(do (async/put! result-chan [:reject  (js->clj %)]) result)]
     (assoc ctx
+      :cljs-lambda/result result
       :handle
       #js {:fail    reject
            :succeed resolve
-           :done    #(if %1 (reject %1) (resolve %2))
+           :done    #(if %1 (reject %1) (resolve (js->clj %2)))
            :getRemainingTimeInMillis msecs-remaining})))
 
 (defn mock-context [& [m]]
-  (-> (merge context-keys m)
-      (set/rename-keys context-keys)
-      (assoc :cljs-lambda/context-type :mock)))
+  (let [result-ch (async/promise-chan)
+        result    (chan->promise result-ch)]
+    (-> (merge context-keys m)
+        (assoc
+          :cljs-lambda/context-type :mock
+          :cljs-lambda/result-chan result-ch
+          :cljs-lambda/result result))))
 
 (defn wrap-lambda-fn [f]
   (fn [event context]
@@ -70,10 +85,6 @@
       (and (fn? (.. x -then))
            (fn? (.. x -catch)))))
 
-(defn- chain-promise [in resolve reject]
-  (.then  in resolve)
-  (.catch in reject))
-
 (defn- chan? [x]
   (satisfies? async-p/ReadPort x))
 
@@ -84,18 +95,11 @@
        (try
          (let [result (apply f args)]
            (cond
-             (promise? result) (chain-promise result resolve reject)
+             (promise? result) (.then result resolve reject)
              (chan?    result) (go (handle (<! result)))
              :else             (handle result)))
          (catch js/Error e
            (reject e)))))))
-
-(defn promise->chan [x]
-  (let [chan (async/chan)
-        done #(do
-                (async/put! chan %)
-                (async/close! chan))]
-    (-> x (.then done) (.catch done))))
 
 (defn handle-errors [f error-handler]
   (fn [event context]
@@ -108,5 +112,5 @@
     (wrap-lambda-fn
      (fn [event context]
        (-> (invoke-async f event context)
-           (.then  (partial succeed! context))
-           (.catch (partial fail!    context)))))))
+           (.then (partial succeed! context)
+                  (partial fail!    context)))))))

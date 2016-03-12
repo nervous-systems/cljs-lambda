@@ -3,7 +3,7 @@
 
 #? (:clj
     (defmacro deflambda [name bindings & body]
-      `(def ~(vary-meta name assoc :expose true)
+      `(def ~(vary-meta name assoc :export true)
          (cljs-lambda.util/async-lambda-fn
           (fn ~bindings
             ~@body)))))
