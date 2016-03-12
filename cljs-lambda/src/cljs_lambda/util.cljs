@@ -2,83 +2,17 @@
   (:require [cljs.nodejs :as nodejs]
             [cljs.core.async :as async :refer [<! >!]]
             [cljs.core.async.impl.protocols :as async-p]
+            [cljs-lambda.context :as ctx]
             [promesa.core :as p])
   (:require-macros [cljs.core.async.macros :refer [go]]))
 
 (nodejs/enable-util-print!)
 
-(defn- context-dispatch [{:keys [cljs-lambda/context-type]} & _]
-  context-type)
-
-(defn- channel-result [{:keys [cljs-lambda/resp-chan]} & [arg]]
-  (go
-    (when arg
-      (>! resp-chan arg))
-    (async/close! resp-chan))
-  arg)
-
-(defn fail! [{:keys [handle]} & [arg]]
-  (.fail handle (clj->js arg)))
-
-(defn succeed! [{:keys [handle]} & [arg]]
-  (.succeed handle (clj->js arg)))
-
-(defn done! [{:keys [handle]} & [bad good]]
-  (.done handle (clj->js bad) (clj->js good)))
-
-(defn msecs-remaining [{:keys [handle]}]
-  (.getRemainingTimeInMillis handle))
-
-(def context-keys
-  {:aws-request-id  "awsRequestId"
-   :client-context  "clientContext"
-   :log-group-name  "logGroupName"
-   :log-stream-name "logStreamName"
-   :function-name   "functionName"})
-
-(defmulti context->map context-dispatch)
-
-(defmethod context->map :default [js-context]
-  (into {:handle js-context}
-    (for [[us them] context-keys]
-      [us (aget js-context them)])))
-
-(defn- chan->promise [ch]
-  (p/promise
-   (fn [resolve reject]
-     (go
-       (let [[tag value] (<! ch)]
-         (case tag
-           :resolve (resolve value)
-           :reject  (reject  value)))))))
-
-(defmethod context->map :mock
-  [{:keys [cljs-lambda/msecs-remaining
-           cljs-lambda/result-chan
-           cljs-lambda/result] :as ctx
-    :or {cljs-lambda/msecs-remaining (constantly -1)}}]
-  (let [resolve   #(do (async/put! result-chan [:resolve (js->clj %)]) result)
-        reject    #(do (async/put! result-chan [:reject  (js->clj %)]) result)]
-    (assoc ctx
-      :handle
-      #js {:fail    reject
-           :succeed resolve
-           :done    #(if %1 (reject %1) (resolve %2))
-           :getRemainingTimeInMillis msecs-remaining})))
-
-(defn mock-context [& [m]]
-  (let [result-ch (async/promise-chan)
-        result    (chan->promise result-ch)]
-    (-> (merge context-keys m)
-        (assoc
-          :cljs-lambda/context-type :mock
-          :cljs-lambda/result-chan result-ch
-          :cljs-lambda/result result))))
-
 (defn wrap-lambda-fn [f]
-  (fn [event context]
+  (fn [event ctx]
     (f (js->clj event :keywordize-keys true)
-       (context->map context))))
+       (cond-> ctx
+         (not (satisfies? ctx/ContextHandle ctx)) ctx/->context))))
 
 (defn- promise? [x]
   (or (instance? js/Promise x)
@@ -104,14 +38,14 @@
 (defn handle-errors [f error-handler]
   (fn [event context]
     (p/catch
-     (invoke-async f event context)
-     #(invoke-async error-handler % event context))))
+      (invoke-async f event context)
+      #(invoke-async error-handler % event context))))
 
 (defn async-lambda-fn [f & [{:keys [error-handler]}]]
   (let [f (cond-> f error-handler (handle-errors error-handler))]
     (wrap-lambda-fn
-     (fn [event context]
-       (-> (invoke-async f event context)
+     (fn [event ctx]
+       (-> (invoke-async f event ctx)
            (p/branch
-             (partial succeed! context)
-             (partial fail!    context)))))))
+             (partial ctx/succeed! ctx)
+             (partial ctx/fail!    ctx)))))))
