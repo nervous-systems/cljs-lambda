@@ -1,4 +1,5 @@
 (ns cljs-lambda.macros
+  #? (:cljs (:require [cljs-lambda.util]))
   #? (:cljs (:require-macros [cljs-lambda.macros])))
 
 #? (:clj

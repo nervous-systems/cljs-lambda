@@ -3,7 +3,6 @@
             [cljs-lambda.local :refer [invoke]]
             [cljs-lambda.context :as ctx]
             [cljs.test :refer-macros [deftest is]]
-            [cljs-lambda.macros :as macros]
             [promesa.core :as p])
   (:require-macros [cljs.core.async.macros :refer [go]]
                    [cljs-lambda.test.help :refer [deftest-async]]))
@@ -122,17 +121,6 @@
            {:error-handler #(throw (js/Error. "Wilderness"))})]
     (p/then (invoke f)
      (will= "Everything's OK!"))))
-
-(macros/deflambda def-wrappers-are-evil [event ctx]
-  (ctx/done! ctx nil event))
-
-(deftest-async deflambda
-  (let [event [1 2 "hello"]]
-    (p/then (invoke def-wrappers-are-evil event)
-      (will= event))))
-
-(deftest deflambda-exports
-  (is (-> #'def-wrappers-are-evil meta :export)))
 
 (deftest-async msecs-remaining
   (let [f (lambda/async-lambda-fn
