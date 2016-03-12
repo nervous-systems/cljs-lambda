@@ -75,14 +75,14 @@
   (.catch in reject))
 
 (defn- chan? [x]
-  (satisfies? async-p/ReadPort result))
+  (satisfies? async-p/ReadPort x))
 
-(defn- invoke [f event context]
+(defn- invoke-async [f & args]
   (js/Promise.
    (fn [resolve reject]
      (let [handle #(if (instance? js/Error %) (reject %) (resolve %))]
        (try
-         (let [result (f event context)]
+         (let [result (apply f args)]
            (cond
              (promise? result) (chain-promise result resolve reject)
              (chan?    result) (go (handle (<! result)))
@@ -95,14 +95,18 @@
         done #(do
                 (async/put! chan %)
                 (async/close! chan))]
-    (-> x
-        (.then  done)
-        (.catch done))))
+    (-> x (.then done) (.catch done))))
 
-(defn async-lambda-fn [f]
-  (wrap-lambda-fn
-   (fn [event context]
-     (-> f
-         (invoke event context)
-         (.then  (partial succeed! context))
-         (.catch (partial fail!    context))))))
+(defn handle-errors [f error-handler]
+  (fn [event context]
+    (.catch
+     (invoke-async f event context)
+     #(invoke-async error-handler % event context))))
+
+(defn async-lambda-fn [f & [{:keys [error-handler]}]]
+  (let [f (cond-> f error-handler (handle-errors error-handler))]
+    (wrap-lambda-fn
+     (fn [event context]
+       (-> (invoke-async f event context)
+           (.then  (partial succeed! context))
+           (.catch (partial fail!    context)))))))
