@@ -94,6 +94,13 @@
     (invoke lambda-fn [:succeed "ayy lmao"])
     (will= "ayy lmao")))
 
+(deftest-async handle-errors
+  (let [f (-> #(throw (js/Error. "ERROR HANDLER IN PLACE"))
+              (lambda/handle-errors (constantly "Success"))
+              lambda/async-lambda-fn)]
+    (p/then (invoke f)
+      (will= "Success"))))
+
 (deftest-async error-handler
   (let [error (js/Error. "Porcupine Z")
         event {:X 'y}
@@ -120,7 +127,7 @@
            (constantly "Everything's OK!")
            {:error-handler #(throw (js/Error. "Wilderness"))})]
     (p/then (invoke f)
-     (will= "Everything's OK!"))))
+      (will= "Everything's OK!"))))
 
 (deftest-async msecs-remaining
   (let [f (lambda/async-lambda-fn

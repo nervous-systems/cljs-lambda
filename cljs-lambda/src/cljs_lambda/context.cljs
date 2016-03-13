@@ -1,6 +1,7 @@
 (ns cljs-lambda.context
-  "Representation & manipulation of Lambda-handler execution context.  Contexts
-  are represented as records with keys:
+  "Representation & manipulation of Lambda-handler execution context.
+
+  Contexts are represented as records with keys:
 
 * `:aws-request-id`
 * `:client-context`

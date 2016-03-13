@@ -195,35 +195,6 @@ execution:
 (cljs-lambda.util/msecs-remaining context)
 ```
 
-## Testing
-
-While it's strongly suggested that Lambda functions are minimal abstractions of
-the execution environment (i.e. input/output processing & delegation to generic
-Clojurescript functions), there are times when it's going to make sense to test
-the entry points off of EC2.
-
-`cljs-lambda.util/mock-context` returns a map containing superficially plausible
-values for the context's keys (and accepts an optional, single map argument
-containing any overrides).  Passing the resulting map to an `async-lambda-fn`
-will cause the returned channel to resolve to the wrapped function's delivered
-value (whether delivered via the wrapped function's channel, or manually via
-`fail!`, etc.).  Results will be placed in a vector beginning with either
-`:succeed` or `:fail`, because it's not always possible to determine this from
-the value itself.
-
-### Example
-
-```clojure
-(def ^:export testable
-  (async-lambda-fn
-   (fn [x context]
-     (go
-       ;; TODO Think hard
-       (inc 1)))))
-
-(testable 5 (mock-context)) ;; => Channel containing [:succeed 6]
-```
-
 # Invoking
 
 ## CLI

@@ -16,6 +16,16 @@ body {
   display: none;
 }
 
+.src-link a {
+    background: none;
+    border: none;
+    font-size: 95%;
+    text-transform: capitalize;
+    color: #0096cc;
+    text-align: right;
+    display: block;
+}
+
 .namespace-docs > .anchor {
     margin-top: 0;
 }

@@ -11,6 +11,8 @@
             [lein-npm       "0.6.0"]
             [lein-cljsbuild "1.1.2"]
             [lein-codox     "0.9.4"]]
+  ;; Codox can't deal w/ deps.cljs, so isolate externs
+  :source-paths ["src" "src-deps"]
   :cljsbuild
   {:builds [{:id "test"
              :source-paths ["src" "test"]

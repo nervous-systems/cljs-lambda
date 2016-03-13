@@ -7,12 +7,12 @@ before_install:
 - sudo pip install awscli
 - sudo apt-get install parallel
 - nvm install 5
-- cd template && lein install && cd ..
+- pushd cljs-lambda; lein install; popd
+- pushd plugin;      lein install; popd
+- pushd template;    lein install; popd
 - lein new cljs-lambda $PROJECT_DIR $SNAPSHOT
-- cd plugin && lein install && cd ..
 - cp -r travis/* $PROJECT_DIR
-- cd $PROJECT_DIR
-script: ./run.sh
+script: (pushd cljs-lambda; lein doo node test once) && (pushd $PROJECT_DIR; ./run.sh)
 env:
   matrix:
   - PROJECT_DIR=test-project-snapshot SNAPSHOT=--snapshot
