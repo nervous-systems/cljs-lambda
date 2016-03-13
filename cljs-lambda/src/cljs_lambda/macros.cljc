@@ -12,9 +12,7 @@
 
 ```clojure
 (deflambda wait [{n :msecs} ctx]
-  (p/promise
-   (fn [resolve _]
-     (p/schedule n #(resolve :waited)))))
+  (p/delay n :waited))
 
 ;; Expands into
 

@@ -76,9 +76,7 @@ Success:
 (def ^:export wait
   (async-lambda-fn
    (fn [{n :msecs} ctx]
-     (promesa/promise
-      (fn [resolve _]
-        (promesa/schedule n #(resolve :waited)))))))
+     (promesa/delay n :waited))))
 ```
 
 Failure:

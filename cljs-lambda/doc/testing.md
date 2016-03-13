@@ -5,13 +5,13 @@ the execution environment (i.e. input/output processing only, delegating to
 naive Clojurescript functions), there are times when it's going to make sense to
 test the entry points off of EC2.
 
-`cljs-lambda.local/invoke` invokes a Lambda handler with the supplied event
+[[cljs-lambda.local/invoke]] invokes a Lambda handler with the supplied event
 (optional, nil), supplying a context suitable for local evaluation.  The context
 record'll contain superficially plausible values for the context's string keys,
 and invoke will ensure that the eventual result of the invocation, however
 delivered, will be conveyed to the caller via a promise.
 
-`cljs-lambda.local/channel` behaves identically, with the exception of placing
+[[cljs-lambda.local/channel]] behaves identically, with the exception of placing
 the result on a `core.async` channel, in a vector tagged with either `:success`
 or `:fail`.
 
