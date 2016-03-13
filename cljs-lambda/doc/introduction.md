@@ -14,7 +14,7 @@ Clojurescript into a deployable zip file is outside the scope of this library,
 and is handled by the excellent [cljs-lambda Leiningen
 plugin](https://github.com/nervous-systems/cljs-lambda#plugin-overview).
 
-The cljs-lambda _library_ is focused on simplifying the defining of
+The cljs-lambda _library_ is focused on simplifying the definition of
 Clojurescript Lambda handlers -- EDN representations of event/context objects,
 eliminating the need for knowledge of the deployment target within generic data
 processing code, etc.
@@ -30,7 +30,7 @@ processing code, etc.
   (p/delay n {:waited n}))
 ```
 
-Let's imagine we're invoking this the command line:
+Let's imagine we're invoking this from the command line:
 
 ```shell
 $ aws lambda invoke --function-name wait --payload 66 output.json
@@ -76,7 +76,7 @@ Promise.
 ### A Note on Promises
 
 Promises are an effective representation of Lambda handler results, insofar
-they're capable of unambiguously representing a single deferred success or
+as they're capable of unambiguously representing a single deferred success or
 failure value.  `core.async` channels may also be returned by `cljs-lambda`
 functions, though they're a less natural fit.
 
@@ -94,7 +94,7 @@ The promise returned by our example'll fire in `n` seconds, with the value
 `{:waited n}` - which'll be serialized to JSON, and returned to the caller as
 `{"waited" 66}`.
 
-In Javascript, an explicit `context.done` method is called to signifify
+In Javascript, an explicit `context.done` method is called to signify
 completion -- we're turning that inside-out, and completing the invocation when
 the handler's Promise is resolved/rejected.
 
