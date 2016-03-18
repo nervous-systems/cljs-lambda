@@ -65,8 +65,8 @@
   (let [error (js/Error. "12 eggs")
         f     (lambda/async-lambda-fn
                (fn [_ ctx]
-                 (js/Promise.
-                  (fn [resolve reject]
+                 (p/promise
+                  (fn [_ _]
                     (js/setTimeout #(ctx/fail! ctx error) 50)))))]
     (catches
      (invoke f)

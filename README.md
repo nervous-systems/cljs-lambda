@@ -1,5 +1,7 @@
 # cljs-lambda
 
+[![Build Status](https://travis-ci.org/nervous-systems/cljs-lambda.svg?branch=master)](https://travis-ci.org/nervous-systems/cljs-lambda)
+
 [AWS Lambda](http://aws.amazon.com/documentation/lambda/) is a service which
 allows named functions to be directly invoked (via a client API), have their
 execution triggered by a variety of AWS events (S3 upload, DynamoDB activity,
@@ -34,6 +36,17 @@ pieces of infrastructure.  While efforts are made to ensure backward
 compatibility in the Leiningen plugin, the `cljs-lambda` API is subject to
 breaking changes.
 
+# Coordinates
+
+## [Plugin](https://github.com/nervous-systems/cljs-lambda/tree/master/plugin)
+
+[![Clojars
+Project](http://clojars.org/io.nervous/lein-cljs-lambda/latest-version.svg)](http://clojars.org/io.nervous/lein-cljs-lambda)
+
+## [Library](https://github.com/nervous-systems/cljs-lambda/tree/master/cljs-lambda)
+
+[![Clojars Project](http://clojars.org/io.nervous/cljs-lambda/latest-version.svg)](http://clojars.org/io.nervous/cljs-lambda)
+
 # Get Started
 
 ```sh
@@ -57,17 +70,6 @@ $ lein cljs-lambda update-config work-magic :memory-size 256 :timeout 66
 
 ## Other
 - [Example project](https://github.com/nervous-systems/cljs-lambda/tree/master/example/) (generated from template)
-
-# Coordinates
-
-## [Plugin](https://github.com/nervous-systems/cljs-lambda/tree/master/plugin)
-
-[![Clojars
-Project](http://clojars.org/io.nervous/lein-cljs-lambda/latest-version.svg)](http://clojars.org/io.nervous/lein-cljs-lambda)
-
-## [Library](https://github.com/nervous-systems/cljs-lambda/tree/master/cljs-lambda)
-
-[![Clojars Project](http://clojars.org/io.nervous/cljs-lambda/latest-version.svg)](http://clojars.org/io.nervous/cljs-lambda)
 
 # Function Examples
 

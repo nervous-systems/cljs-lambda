@@ -4,7 +4,12 @@ try {
 } catch(err) {
 }
 {{/source-map}}
+
 require("./{{output-dir}}/goog/bootstrap/nodejs.js");
+
+// It's not clear why this is necessary
+goog.global.CLOSURE_UNCOMPILED_DEFINES = {"cljs.core._STAR_target_STAR_":"nodejs"};
+
 require("./{{output-to}}");
 
 {{#module}}

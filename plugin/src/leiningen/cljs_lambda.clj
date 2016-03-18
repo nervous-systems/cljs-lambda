@@ -49,9 +49,9 @@
         [build] (if-not cljs-build-id
                   builds
                   (filter #(= (:id %) cljs-build-id) builds))]
-    (if-not build
-      (leiningen.core.main/abort "Can't find cljsbuild build")
-      build)))
+    (cond (not build)   (leiningen.core.main/abort "Can't find cljsbuild build")
+          (build :main) (leiningen.core.main/abort "Can't deploy build w/ :main")
+          :else         build)))
 
 (def fn-keys
   #{:name :create :region :memory-size :role :invoke :description :timeout

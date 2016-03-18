@@ -2,7 +2,7 @@
   (:require [{{name}}.core :refer [work-magic config]]
             [cljs.test :refer-macros [deftest is]]
             [cljs-lambda.local :refer [invoke channel]]
-            [promesa.core :as p :refer-macros [alet]]
+            [promesa.core :as p :refer [await] :refer-macros [alet]]
             [cljs.core.async :refer [<!]])
   (:require-macros [cljs.core.async.macros :refer [go]]))
 
@@ -10,9 +10,7 @@
   (cljs.test/async
    done
    (-> p
-       (p/catch (fn [e]
-                  (println (.. e -stack))
-                  (is (not e))))
+       (p/catch #(is (not %)))
        (p/then done))))
 
 (defn with-some-error [p]
@@ -20,7 +18,7 @@
     #(is false "Expected error")
     (constantly nil)))
 
-(deftest wrong-word
+(deftest echo
   (-> (invoke work-magic {:magic-word "not the magic word"})
       with-some-error
       with-promised-completion))
@@ -31,8 +29,9 @@
    :msecs 2})
 
 (deftest delay-channel-spell
-  (-> (invoke work-magic delay-channel-req)
-      (p/then #(is (= % {"waited" 2})))))
+  (with-promised-completion
+    (alet [{:keys [waited]} (await (invoke work-magic delay-channel-req))]
+      (is (= waited 2)))))
 
 (deftest delay-channel-spell-go
   (cljs.test/async
@@ -40,7 +39,7 @@
    (go
      (let [[tag response] (<! (channel work-magic delay-channel-req))]
        (is (= tag :succeed))
-       (is (= response {"waited" 2})))
+       (is (= response {:waited 2})))
      (done))))
 
 (deftest delay-fail-spell

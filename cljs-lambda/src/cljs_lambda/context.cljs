@@ -7,7 +7,7 @@
 * `:client-context`
 * `:log-group-name`
 * `:log-stream-name`
-* `:function-name`" )
+* `:function-name`")
 
 (defprotocol ContextHandle
   (-done!
@@ -16,7 +16,7 @@
   (msecs-remaining
    [this]
    "The number of milliseconds remaining until the timeout of the invocation
-   associated with this context." ))
+   associated with this context."))
 
 (defrecord ^:no-doc LambdaContext [js-handle]
   ContextHandle
@@ -36,6 +36,7 @@
 ```"
   [ctx & [err result]]
   (-done! ctx (clj->js err) (clj->js result)))
+
 (defn fail!
   "Trivial wrapper around [[done!]]
 
@@ -49,6 +50,7 @@
 ```"
   [ctx & [err]]
   (done! ctx err nil))
+
 (defn succeed!
   "Trivial wrapper around [[done!]]
 
