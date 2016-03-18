@@ -1,42 +1,52 @@
 (ns {{name}}.core-test
   (:require [{{name}}.core :refer [work-magic config]]
             [cljs.test :refer-macros [deftest is]]
-            [cljs-lambda.util :refer [mock-context]]
-            [cljs.core.async :as async])
+            [cljs-lambda.local :refer [invoke channel]]
+            [promesa.core :as p :refer-macros [alet]]
+            [cljs.core.async :refer [<!]])
   (:require-macros [cljs.core.async.macros :refer [go]]))
 
+(defn with-promised-completion [p]
+  (cljs.test/async
+   done
+   (-> p
+       (p/catch (fn [e]
+                  (println (.. e -stack))
+                  (is (not e))))
+       (p/then done))))
+
+(defn with-some-error [p]
+  (p/branch p
+    #(is false "Expected error")
+    (constantly nil)))
+
 (deftest wrong-word
-  (cljs.test/async
-   done
-   (go
-     (let [[tag result] (<! (work-magic
-                             {:magic-word "not the magic word"}
-                             (mock-context)))]
-       (is (= tag :fail))
-       (done)))))
+  (-> (invoke work-magic {:magic-word "not the magic word"})
+      with-some-error
+      with-promised-completion))
 
-(deftest delay-spell
+(def delay-channel-req
+  {:magic-word (:magic-word config)
+   :spell :delay-channel
+   :msecs 2})
+
+(deftest delay-channel-spell
+  (-> (invoke work-magic delay-channel-req)
+      (p/then #(is (= % {"waited" 2})))))
+
+(deftest delay-channel-spell-go
   (cljs.test/async
    done
    (go
-     (let [[tag result] (<! (work-magic
-                             {:magic-word (:magic-word config)
-                              :spell :delay
-                              :msecs 2}
-                             (mock-context)))]
+     (let [[tag response] (<! (channel work-magic delay-channel-req))]
        (is (= tag :succeed))
-       (is (= result {:waited 2}))
-       (done)))))
+       (is (= response {"waited" 2})))
+     (done))))
 
-(deftest delayed-failure-spell
-  (cljs.test/async
-   done
-   (go
-     (let [[tag result] (<! (work-magic
-                             {:magic-word (:magic-word config)
-                              :spell :delayed-failure
-                              :msecs 3}
-                             (mock-context)))]
-       (is (= tag :fail))
-       (is (instance? js/Error result))
-       (done)))))
+(deftest delay-fail-spell
+  (-> (invoke work-magic
+              {:magic-word (:magic-word config)
+               :spell :delay-fail
+               :msecs 3})
+      with-some-error
+      with-promised-completion))
