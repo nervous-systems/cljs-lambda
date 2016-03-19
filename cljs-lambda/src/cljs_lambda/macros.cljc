@@ -1,5 +1,6 @@
 (ns cljs-lambda.macros
-  #? (:cljs (:require [cljs-lambda.util]))
+  (:require #? (:clj  [clojure.tools.macro :as macro]
+                :cljs [cljs-lambda.util]))
   #? (:cljs (:require-macros [cljs-lambda.macros])))
 
 #? (:clj
@@ -21,8 +22,9 @@
    (fn [{n :msecs} ctx]
      ...)))
 ```"
-      [name bindings & body]
-      `(def ~(vary-meta name assoc :export true)
-         (cljs-lambda.util/async-lambda-fn
-          (fn ~bindings
-            ~@body)))))
+      [name & body]
+      (let [[name [bindings & body]] (macro/name-with-attributes name body)]
+       `(def ~(vary-meta name assoc :export true)
+          (cljs-lambda.util/async-lambda-fn
+           (fn ~bindings
+             ~@body))))))

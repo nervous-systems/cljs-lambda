@@ -7,6 +7,7 @@
   (:require-macros [cljs.core.async.macros :refer [go]]))
 
 (nodejs/enable-util-print!)
+(set! *main-cli-fn* identity)
 
 (defn wrap-lambda-fn
   "Prepare a two-arg (event, context) function for exposure as a Lambda handler.
@@ -21,23 +22,21 @@
        (cond-> ctx
          (not (satisfies? ctx/ContextHandle ctx)) ctx/->context))))
 
-(defn- promise? [x]
-  (or (instance? js/Promise x)
-      (fn? (.. x -then))))
-
 (defn- chan? [x]
   (satisfies? async-p/ReadPort x))
+
+(defn- error? [x]
+  (instance? js/Error x))
 
 (defn- invoke-async [f & args]
   (p/promise
    (fn [resolve reject]
-     (let [handle #(if (instance? js/Error %) (reject %) (resolve %))]
+     (let [handle #(if (error? %) (reject %) (resolve %))]
        (try
          (let [result (apply f args)]
-           (cond
-             (promise? result) (p/branch result resolve reject)
-             (chan?    result) (go (handle (<! result)))
-             :else             (handle result)))
+           (cond (p/promise? result) (p/branch result resolve reject)
+                 (chan?    result)   (go (handle (<! result)))
+                 :else               (handle result)))
          (catch js/Error e
            (reject e)))))))
 
@@ -68,7 +67,7 @@
 
 Success:
 
-* Returns successful `js/Promise` (or object w/ `.then()`)
+* Returns successful Promesa/Bluebird promise
 * Returns `core.async` channel containing non-`js/Error`
 * Synchronously returns arbitrary object
 
@@ -81,7 +80,7 @@ Success:
 
 Failure:
 
-* Returns rejected `js/Promise`
+* Returns rejected Promesa/Bluebird promise
 * Returns `core.async` channel containing `js/Error`
 * Synchronously throws `js/Error`
 

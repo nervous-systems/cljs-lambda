@@ -10,7 +10,9 @@
 (defrecord ^:no-doc LocalContext [result-channel]
   ctx/ContextHandle
   (-done! [this err result]
-    (async/put! result-channel [(js->clj err) (js->clj result)]))
+    (async/put!
+     result-channel [(js->clj err    :keywordize-keys true)
+                     (js->clj result :keywordize-keys true)]))
   (msecs-remaining [this]
     -1))
 
