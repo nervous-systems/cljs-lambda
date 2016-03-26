@@ -8,9 +8,6 @@
             [promesa.core :as p])
   (:require-macros [cljs.core.async.macros :refer [go]]))
 
-;; For optimizations :advanced
-(set! *main-cli-fn* identity)
-
 (def config
   (-> (nodejs/require "fs")
       (.readFileSync "static/config.edn" "UTF-8")
@@ -42,4 +39,6 @@
 (deflambda work-magic [{:keys [magic-word] :as input} context]
   (when (not= magic-word (config :magic-word))
     (throw (js/Error. "Your magic word is garbage")))
-  (cast-async-spell input context))
+  (if (= (input :spell) "echo-env")
+    (ctx/environment ctx)
+    (cast-async-spell input context)))

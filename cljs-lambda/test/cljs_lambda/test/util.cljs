@@ -1,6 +1,6 @@
 (ns cljs-lambda.test.util
   (:require [cljs-lambda.util :as lambda]
-            [cljs-lambda.local :refer [invoke]]
+            [cljs-lambda.local :as local :refer [invoke]]
             [cljs-lambda.context :as ctx]
             [cljs.test :refer-macros [deftest is]]
             [promesa.core :as p])
@@ -135,3 +135,11 @@
              (ctx/msecs-remaining ctx)))]
     (p/then (invoke f)
       (will= -1))))
+
+(deftest-async env
+  (let [f   (lambda/async-lambda-fn
+             (fn [_ ctx]
+               (ctx/env ctx :ENV_VAR)))
+        ctx (local/->context {:env {'ENV_VAR "deftest-async env"}})]
+    (p/then (invoke f nil ctx)
+      (will= "deftest-async env"))))

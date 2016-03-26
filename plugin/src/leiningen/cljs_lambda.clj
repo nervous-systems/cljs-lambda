@@ -24,7 +24,7 @@
        {:export  (export-name f)
         :js-name (str (munge ns) "." (munge (name f)))})}))
 
-(defn- generate-index [{:keys [optimizations source-map] :as compiler-opts} fns]
+(defn- generate-index [env {:keys [optimizations source-map] :as compiler-opts} fns]
   (let [template (slurp (io/resource
                          (if (= optimizations :advanced)
                            "index-advanced.mustache"
@@ -33,7 +33,9 @@
      template
      (assoc compiler-opts
        :source-map (when source-map true)
-       :module     (fns->module-template fns)))))
+       :module     (fns->module-template fns)
+       :env        (for [[k v] env]
+                     {:key k :value v})))))
 
 (defn- write-index [output-dir s]
   (let [file (io/file output-dir "index.js")]
@@ -99,9 +101,24 @@
         :keyword-args    cli-kws
         :functions       (augment-fns cljs-lambda function-names cli-kws)))))
 
+(defn- ->string-matcher [x]
+  (cond
+    (or (symbol? x) (string? x) (keyword? x)) #(= (name x) %)
+    (instance? java.util.regex.Pattern x)     #(re-find x %)))
+
+(defn capture-env [{capture :capture set-vars :set}]
+  (let [capture? (if (not-empty capture)
+                   (apply some-fn (map ->string-matcher capture))
+                   (constantly false))
+        env      (filter (comp capture? key) (System/getenv))]
+    (merge (into {} env)
+           (into {}
+             (for [[k v] set-vars]
+               [(name k) v])))))
+
 (defn build
   "Write a zip file suitable for Lambda deployment"
-  [{{:keys [cljs-build cljs-build-id functions resource-dirs]} :cljs-lambda
+  [{{:keys [cljs-build cljs-build-id functions resource-dirs env]} :cljs-lambda
     :as project}]
   (log :verbose
        (with-out-str
@@ -110,7 +127,7 @@
   (let [{{:keys [output-dir optimizations] :as compiler} :compiler} cljs-build
         project-name (-> project :name name)
         index-path   (->> functions
-                          (generate-index compiler)
+                          (generate-index (capture-env env) compiler)
                           (write-index output-dir))]
     (write-zip
      compiler
