@@ -7,14 +7,23 @@
             [cljs.core.async :as async])
   (:require-macros [cljs.core.async.macros :refer [go]]))
 
-(defrecord ^:no-doc LocalContext [result-channel]
+(defrecord ^:no-doc LocalContext [result-channel env]
   ctx/ContextHandle
   (-done! [this err result]
     (async/put!
      result-channel [(js->clj err    :keywordize-keys true)
                      (js->clj result :keywordize-keys true)]))
   (msecs-remaining [this]
-    -1))
+    -1)
+  (environment [this]
+    env))
+
+(defn- stringify-keys
+  "Shallowly un-keyword/un-symbol the keys in m"
+  [m]
+  (into {}
+    (for [[k v] m]
+      [(name k) v])))
 
 (defn ->context
   "Create a `context` object for use w/ [[invoke]], [[channel]].  This is
@@ -31,7 +40,7 @@
   (map->LocalContext
    (merge ctx/context-keys
           {:result-channel (async/promise-chan)}
-          key-overrides)))
+          (update key-overrides :env stringify-keys))))
 
 (defn- channel->promise [ch]
   (p/promise

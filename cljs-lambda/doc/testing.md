@@ -2,8 +2,8 @@
 
 While it's strongly suggested that Lambda functions are minimal abstractions of
 the execution environment (i.e. input/output processing only, delegating to
-naive Clojurescript functions), there are times when it's going to make sense to
-test the entry points off of EC2.
+generic Clojurescript functions), there are times when it's going to make sense
+to test the entry points off of EC2.
 
 [[cljs-lambda.local/invoke]] invokes a Lambda handler with the supplied event
 (optional, nil), supplying a context suitable for local evaluation.  The context
@@ -30,7 +30,7 @@ or `:fail`.
 ### Example
 
 ```clojure
-(def fs (.promisifyAll js/Promise (nodejs/require "fs")))
+(def fs (.promisifyAll promesa/Promise (nodejs/require "fs")))
 
 (deflambda read-file [path ctx]
   (.readFileAsync fs path))
@@ -45,8 +45,23 @@ or `:fail`.
   (str "Hi " caller-name " I'm " my-name))
 
 ;; The default context values aren't particularly exciting
-(invoke read-file "Mary") => ;; <Promise "Hi Mary, I'm functionName">
+(invoke identify "Mary") => ;; <Promise "Hi Mary, I'm functionName">
 ;; But custom values may be supplied
-(invoke read-file "Mary" (->context {:function-name "identify"}))
+(invoke identify "Mary" (->context {:function-name "identify"}))
 ;; => ;; <Promise "Hi Mary, I'm identify">
 ```
+
+## Environment Variables
+
+When testing functions which retrieve environment variables via
+[[cljs-lambda.context/env]], alternate values may be supplied in a test's
+context object.
+
+```clojure
+(deflambda env [k ctx]
+  (ctx/env ctx k))
+
+(invoke read-file "USER" (->context {:env {"USER" "moe"}}))
+```
+
+When deployed, `ctx/env` would read the value from Node's `process.env`.

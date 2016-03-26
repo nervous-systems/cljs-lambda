@@ -16,14 +16,30 @@
   (msecs-remaining
    [this]
    "The number of milliseconds remaining until the timeout of the invocation
-   associated with this context."))
+   associated with this context.")
+  (environment
+   [this]
+   "Retrieve a map of environment variables."))
 
 (defrecord ^:no-doc LambdaContext [js-handle]
   ContextHandle
   (-done! [this err result]
     (.done js-handle err result))
   (msecs-remaining [this]
-    (.getRemainingTimeInMillis js-handle)))
+    (.getRemainingTimeInMillis js-handle))
+  (environment [this]
+    (js->clj (.. js/process -env))))
+
+(defn env
+  "Retrieve an environment variable by name, defaulting to `nil` if not found.
+
+```clojure
+(env ctx \"USER\")
+(env ctx :USER)
+(env ctx 'USER)
+```"
+  [ctx k]
+  (get (environment ctx) (name k)))
 
 (defn done!
   "Terminate execution of the handler associated w/ the given context, conveying

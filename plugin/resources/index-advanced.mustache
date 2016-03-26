@@ -5,6 +5,10 @@ try {
 }
 {{/source-map}}
 
+{{#env}}
+process.env.{{key}} = "{{value}}";
+{{/#env}}
+
 require("./{{output-to}}");
 
 {{#module}}
