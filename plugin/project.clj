@@ -6,6 +6,7 @@
                  [lein-npm       "0.5.0"]
                  [base64-clj     "0.1.1"]
                  [de.ubercode.clostache/clostache "1.4.0"]
+                 [org.apache.commons/commons-compress "1.11"]
                  [camel-snake-kebab "0.3.2"]]
   :exclusions [org.clojure/clojure]
   :eval-in-leiningen true)
