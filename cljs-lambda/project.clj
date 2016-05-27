@@ -1,4 +1,4 @@
-(defproject io.nervous/cljs-lambda "0.3.1-SNAPSHOT"
+(defproject io.nervous/cljs-lambda "0.3.1"
   :description "Clojurescript AWS Lambda utilities"
   :url "https://github.com/nervous-systems/cljs-lambda"
   :license {:name "Unlicense" :url "http://unlicense.org/UNLICENSE"}
