@@ -7,7 +7,8 @@
 * `:client-context`
 * `:log-group-name`
 * `:log-stream-name`
-* `:function-name`")
+* `:function-name`
+* `:identity` (optional)")
 
 (defprotocol ContextHandle
   (-done!
@@ -88,7 +89,14 @@
    :log-stream-name "logStreamName"
    :function-name   "functionName"})
 
+(defn- identity-map [js-context]
+  (when-let [id (.. js-context -identity)]
+    {:cognito-id   (.. id -cognitoIdentityId)
+     :cognito-pool (.. id -cognitoIdentityPoolId)}))
+
 (defn ^:no-doc ->context [js-context]
-  (into (->LambdaContext js-context)
-    (for [[us them] context-keys]
-      [us (aget js-context them)])))
+  (let [id (identity-map js-context)]
+    (cond-> (into (->LambdaContext js-context)
+              (for [[us them] context-keys]
+                [us (aget js-context them)]))
+      id (assoc :identity id))))
