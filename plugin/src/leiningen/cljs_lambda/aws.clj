@@ -67,10 +67,11 @@
     nil
     {:preserve-names? true})))
 
+(def default-runtime "nodejs4.3")
+
 (defn- create-function! [fn-spec zip-path]
-  (let [args (-> fn-spec
-                 (assoc :runtime "nodejs" :zip-file zip-path)
-                 fn-spec->cli-args)]
+  (let [args (fn-spec->cli-args
+              (merge {:runtime default-runtime} fn-spec {:zip-file zip-path}))]
     (-> (lambda-cli! :create-function args) :out str/trim)))
 
 (defn- update-function-config! [fn-spec]

@@ -57,7 +57,7 @@
 
 (def fn-keys
   #{:name :create :region :memory-size :role :invoke :description :timeout
-    :publish :alias})
+    :publish :alias :runtime})
 
 (defn- augment-fn [{:keys [defaults]} cli-kws fn-spec]
   (merge default-defaults
