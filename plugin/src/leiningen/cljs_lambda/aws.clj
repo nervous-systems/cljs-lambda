@@ -45,11 +45,11 @@
 (def lambda-cli! (partial aws-cli! "lambda"))
 
 (def fn-config-args
-  #{:name :role :handler :description :timeout :memory-size})
+  #{:name :role :handler :description :timeout :memory-size :runtime})
 
 (def create-function-args
   (into fn-config-args
-    #{:runtime :zip-file :output :query}))
+    #{:zip-file :output :query}))
 
 (defn fn-spec->cli-args [{:keys [publish] :as fn-spec}]
   (let [args (merge {:output "text" :query "Version"} fn-spec)]

@@ -44,7 +44,7 @@
       (.write w s))
     (.getPath file)))
 
-(def default-defaults {:create true})
+(def default-defaults {:create true :runtime "nodejs4.3"})
 
 (defn- extract-build [{{:keys [cljs-build-id]} :cljs-lambda :as project}]
   (let [{:keys [builds]} (cljsbuild.config/extract-options project)
