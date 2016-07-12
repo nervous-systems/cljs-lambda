@@ -8,6 +8,7 @@
 * `:log-group-name`
 * `:log-stream-name`
 * `:function-name`
+* `:function-arn`
 * `:identity` (optional)")
 
 (defprotocol ContextHandle
