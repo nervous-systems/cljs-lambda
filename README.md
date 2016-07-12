@@ -36,6 +36,13 @@ pieces of infrastructure.  While efforts are made to ensure backward
 compatibility in the Leiningen plugin, the `cljs-lambda` API is subject to
 breaking changes.
 
+### Recent Changes
+
+- `io.nervous/lein-cljs-lambda` 0.6.0 defaults the runtime of deployed functions
+to `nodejs4.3`, unless this is overriden with `:runtime` in the fn-spec or on
+the command-line.  While your functions will be backwards compatible, your AWS
+CLI installation may require updating to support this change.
+
 # Coordinates
 
 ## [Plugin](https://github.com/nervous-systems/cljs-lambda/tree/master/plugin)
