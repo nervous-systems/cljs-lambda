@@ -87,7 +87,8 @@
    :client-context  "clientContext"
    :log-group-name  "logGroupName"
    :log-stream-name "logStreamName"
-   :function-name   "functionName"})
+   :function-name   "functionName"
+   :function-arn    "invokedFunctionArn"})
 
 (defn- identity-map [js-context]
   (when-let [id (.. js-context -identity)]
