@@ -68,8 +68,6 @@
 
 (defn- verify-fn-args [{:keys [functions]} {:keys [alias publish]}]
   (when alias
-    (when (< 1 (count functions))
-      (leiningen.core.main/abort "Can't alias multiple functions"))
     (when-not publish
       (leiningen.core.main/abort "Can't alias unpublished function"))))
 

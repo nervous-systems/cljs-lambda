@@ -57,6 +57,16 @@
         (select-keys create-function-args)
         (->cli-args (cond-> [] publish (conj "--publish"))))))
 
+(defn update-alias! [alias-name fn-name version]
+  (lambda-cli!
+    :update-alias
+    (->cli-args
+      {:function-name fn-name
+       :name alias-name
+       :function-version version}
+      nil
+      {:preserve-names? true})))
+
 (defn create-alias! [alias-name fn-name version]
   (lambda-cli!
    :create-alias
@@ -65,7 +75,8 @@
      :name alias-name
      :function-version version}
     nil
-    {:preserve-names? true})))
+    {:preserve-names? true})
+   {:fatal? false}))
 
 (def default-runtime "nodejs4.3")
 
@@ -133,9 +144,13 @@
      (with-meta-config fn-spec
        (let [version (deploy-function! (str "fileb://" zip-path) fn-spec)]
          (if fn-alias
-           (create-alias! fn-alias fn-name version)
-           (when version
-             (println version))))))
+           (let [{:keys [exit err] :as r} (create-alias! fn-alias fn-name version)]
+             (when-not (zero? exit)
+               (if (.contains err "ResourceConflictException")
+                 (update-alias! fn-alias fn-name version)
+                 (leiningen.core.main/abort err)))
+             (when version
+               (println version)))))))
    cljs-lambda))
 
 (defn update-config! [{fn-name :name :as fn-spec}]

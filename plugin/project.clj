@@ -1,4 +1,4 @@
-(defproject io.nervous/lein-cljs-lambda "0.6.0"
+(defproject io.nervous/lein-cljs-lambda "0.6.1-SNAPSHOT"
   :description "Deploying Clojurescript functions to AWS Lambda"
   :url "https://github.com/nervous-systems/cljs-lambda"
   :license {:name "Unlicense" :url "http://unlicense.org/UNLICENSE"}
