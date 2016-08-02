@@ -145,7 +145,7 @@
        (let [version (deploy-function! (str "fileb://" zip-path) fn-spec)]
          (if fn-alias
            (let [{:keys [exit err] :as r} (create-alias! fn-alias fn-name version)]
-             (if (not (zero? exit))
+             (when-not (zero? exit)
                (if (.contains err "ResourceConflictException")
                  (update-alias! fn-alias fn-name version)
                  (leiningen.core.main/abort err)))
