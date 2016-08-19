@@ -148,9 +148,9 @@
              (when-not (zero? exit)
                (if (.contains err "ResourceConflictException")
                  (update-alias! fn-alias fn-name version)
-                 (leiningen.core.main/abort err)))
-             (when version
-               (println version)))))))
+                 (leiningen.core.main/abort err))))
+           (when version
+             (println version))))))
    cljs-lambda))
 
 (defn update-config! [{fn-name :name :as fn-spec}]
