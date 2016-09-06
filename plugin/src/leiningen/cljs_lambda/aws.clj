@@ -7,6 +7,7 @@
             [clojure.set :as set]
             [clojure.string :as str]
             [base64-clj.core :as base64]
+            [clojure.pprint :as pprint]
             [camel-snake-kebab.core :as csk])
   (:import [java.io File]
            [java.util.concurrent Executors]))
@@ -178,7 +179,7 @@
         {logs :out} (lambda-cli! :invoke args)]
     (log :verbose (base64/decode (str/trim logs)))
     (let [output (slurp out-path)]
-      (clojure.pprint/pprint
+      (pprint/pprint
        (try
          (json/parse-string output true)
          (catch Exception e
