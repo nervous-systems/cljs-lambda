@@ -116,11 +116,13 @@
 
 (defn build
   "Write a zip file suitable for Lambda deployment"
-  [{{:keys [cljs-build cljs-build-id functions resource-dirs env]} :cljs-lambda
+  [{{:keys [cljs-build cljs-build-id functions resource-dirs env managed-deps]} :cljs-lambda
     :as project}]
   (log :verbose
        (with-out-str
-         (npm/npm project "install")
+         (if managed-deps
+           (println "Note: You set the :managed-deps options to true, so dependencies won't be handled automatically.")
+           (npm/npm project "install"))
          (cljsbuild/cljsbuild project "once" (:id cljs-build))))
   (let [{{:keys [output-dir optimizations] :as compiler} :compiler} cljs-build
         project-name (-> project :name name)
