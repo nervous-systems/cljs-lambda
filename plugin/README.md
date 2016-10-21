@@ -31,6 +31,7 @@ $ lein cljs-lambda update-config work-magic :memory-size 256 :timeout 66
  {:cljs-build-id "cljs-lambda-example"
   :defaults {:role "arn:aws:iam::151963828411:role/..."}
   :resource-dirs ["config"]
+  :managed-deps false
   :region ... ;; This'll default to your AWS CLI profile's region
   :functions
   [{:name   "dog-bark"
