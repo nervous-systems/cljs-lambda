@@ -8,7 +8,8 @@
             [clojure.string :as str]
             [base64-clj.core :as base64]
             [clojure.pprint :as pprint]
-            [camel-snake-kebab.core :as csk])
+            [camel-snake-kebab.core :as csk]
+            [clojure.string :as string])
   (:import [java.io File]
            [java.util.concurrent Executors]))
 
@@ -25,10 +26,22 @@
     args/*region*      (assoc :region  (name args/*region*))
     args/*aws-profile* (assoc :profile (name args/*aws-profile*))))
 
+(defn update-vpc-value [{:keys [vpc] :as fn-spec}]
+  (if-not vpc
+    fn-spec
+    (let [subnets (:subnets vpc)
+          security-groups (:security-groups vpc)]
+      (merge fn-spec {:vpc (string/join
+                             ["SubnetIds=["
+                              (string/join "," subnets)
+                              "],SecurityGroupIds=["
+                              (string/join "," security-groups)
+                              "]"])}))))
+
 (defn ->cli-args [m & [positional {:keys [preserve-names?]}]]
-  (let [m    (cond-> (merge (meta-config) m)
+  (let [m    (cond-> (merge (meta-config) (update-vpc-value m))
                (not preserve-names?)
-               (set/rename-keys {:name :function-name}))
+               (set/rename-keys {:name :function-name :vpc :vpc-config}))
         args (flatten
               (for [[k v] m]
                 [(str "--" (name k))
@@ -46,16 +59,34 @@
 (def lambda-cli! (partial aws-cli! "lambda"))
 
 (def fn-config-args
-  #{:name :role :handler :description :timeout :memory-size :runtime})
+  #{:name :role :handler :description :timeout :memory-size :runtime :vpc})
 
 (def create-function-args
   (into fn-config-args
     #{:zip-file :output :query}))
 
-(defn fn-spec->cli-args [{:keys [publish] :as fn-spec}]
+(def update-function-code-args
+  (remove #{:vpc} create-function-args))
+
+(defn validate-fn-spec! [{fn-name :name vpc :vpc}]
+  (let [subnets (:subnets vpc)
+        security-groups (:security-groups vpc)
+        vpc-set (or (seq subnets) (seq security-groups))]
+    (when vpc-set
+      (when-not (and (> (count subnets) 0) (> (count security-groups) 0))
+        (leiningen.core.main/abort
+          "Invalid VPC spec for" fn-name "function. At least one subnet and one security group must be specified"))
+      (when-not (every? string? subnets)
+        (leiningen.core.main/abort
+          "Invalid VPC spec for" fn-name "function. Subnets not a list of strings:" subnets))
+      (when-not (every? string? security-groups)
+        (leiningen.core.main/abort
+          "Invalid VPC spec for" fn-name "function. Security groups not a list of strings:" security-groups)))))
+
+(defn fn-spec->cli-args [fn-args {:keys [publish] :as fn-spec}]
   (let [args (merge {:output "text" :query "Version"} fn-spec)]
     (-> args
-        (select-keys create-function-args)
+        (select-keys fn-args)
         (->cli-args (cond-> [] publish (conj "--publish"))))))
 
 (defn update-alias! [alias-name fn-name version]
@@ -83,19 +114,22 @@
 
 (defn- create-function! [fn-spec zip-path]
   (let [args (fn-spec->cli-args
-              (merge {:runtime default-runtime} fn-spec {:zip-file zip-path}))]
+               create-function-args
+               (merge {:runtime default-runtime} fn-spec {:zip-file zip-path}))]
     (-> (lambda-cli! :create-function args) :out str/trim)))
 
 (defn- update-function-config! [fn-spec]
   (lambda-cli!
    :update-function-configuration
-   (-> fn-spec
+   (-> (merge {:vpc {:subnets [] :security-groups []}} fn-spec)
        (select-keys fn-config-args)
        ->cli-args)))
 
 (defn- update-function-code!
   [{:keys [name publish] :as fn-spec} zip-path]
-  (let [args (fn-spec->cli-args {:name name :zip-file zip-path :publish publish})]
+  (let [args (merge (fn-spec->cli-args
+                      update-function-code-args
+                      {:name name :zip-file zip-path :publish publish}))]
     (-> (lambda-cli! :update-function-code args)
         :out
         str/trim)))
@@ -109,13 +143,28 @@
       255 nil
       0   (json/parse-string out csk/->kebab-case-keyword))))
 
+(defn normalize-config [config]
+  (as-> config x
+    (assoc-in x [:vpc :subnets] (sort (get-in x [:vpc :subnets])))
+    (assoc-in x [:vpc :security-groups] (sort (get-in x [:vpc :security-groups])))))
+
+(defn remote-config->local-config [remote]
+  (let [remote (set/rename-keys remote {:function-name :name :vpc-config :vpc})]
+    (if-let [vpc (:vpc remote)]
+      (assoc remote :vpc
+        (-> vpc
+            (select-keys #{:subnet-ids :security-group-ids})
+            (set/rename-keys {:subnet-ids :subnets :security-group-ids :security-groups})))
+      remote)))
+
 (defn same-config? [remote local]
-  (let [remote (set/rename-keys remote {:function-name :name})
-        local  (select-keys local fn-config-args)]
+  (let [remote (-> remote remote-config->local-config normalize-config)
+        local  (-> local (select-keys fn-config-args) normalize-config)]
     (= (select-keys remote (keys local)) local)))
 
 (defn- deploy-function!
   [zip-path {fn-name :name create? :create :as fn-spec}]
+  (validate-fn-spec! fn-spec)
   (if-let [remote-config (get-function-configuration! fn-spec)]
     (do
       (when-not (same-config? remote-config fn-spec)
