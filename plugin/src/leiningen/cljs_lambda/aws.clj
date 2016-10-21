@@ -144,9 +144,9 @@
       0   (json/parse-string out csk/->kebab-case-keyword))))
 
 (defn normalize-config [config]
-  (as-> config x
-    (assoc-in x [:vpc :subnets] (sort (get-in x [:vpc :subnets])))
-    (assoc-in x [:vpc :security-groups] (sort (get-in x [:vpc :security-groups])))))
+  (-> config
+      (update-in [:vpc :subnets] sort)
+      (update-in [:vpc :security-groups] sort)))
 
 (defn remote-config->local-config [remote]
   (let [remote (set/rename-keys remote {:function-name :name :vpc-config :vpc})]
