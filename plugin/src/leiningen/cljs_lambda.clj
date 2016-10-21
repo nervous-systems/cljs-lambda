@@ -116,11 +116,11 @@
 
 (defn build
   "Write a zip file suitable for Lambda deployment"
-  [{{:keys [cljs-build cljs-build-id functions resource-dirs env managed-deps]} :cljs-lambda
+  [{{:keys [cljs-build cljs-build-id functions resource-dirs env] :as opts} :cljs-lambda
     :as project}]
   (log :verbose
        (with-out-str
-         (if managed-deps
+         (if (or (opts :managed-deps) (-> opts :keyword-args :managed-deps))
            (println "Note: You set the :managed-deps options to true, so dependencies won't be handled automatically.")
            (npm/npm project "install"))
          (cljsbuild/cljsbuild project "once" (:id cljs-build))))
@@ -187,7 +187,7 @@
 
   ([project subtask & args]
    (if-let [subtask-fn (task->fn subtask)]
-     (let [[pos kw]    (args/split-args args #{:publish :quiet})
+     (let [[pos kw]    (args/split-args args #{:publish :quiet :managed-deps})
            [kw quiet]  [(dissoc kw :quiet) (kw :quiet)]
            project     (augment-project project pos kw)
            meta-config (-> project :cljs-lambda :meta-config)]
