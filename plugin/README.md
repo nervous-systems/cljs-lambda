@@ -59,7 +59,8 @@ invoked.  An example:
  :description nil
  :create true
  :timeout 3 ;; seconds
- :memory-size 128} ;; MB
+ :memory-size 128 ;; MB
+ :vpc { :subnets [] :security-groups [] }
 ```
 
 The wiki's [plugin
