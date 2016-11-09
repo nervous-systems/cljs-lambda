@@ -11,6 +11,9 @@
 * `:function-arn`
 * `:identity` (optional)")
 
+(defn- json->edn [json]
+  (js->clj (js/JSON.parse (js/JSON.stringify json))))
+
 (defprotocol ContextHandle
   (-done!
    [this err result]
@@ -30,7 +33,7 @@
   (msecs-remaining [this]
     (.getRemainingTimeInMillis js-handle))
   (environment [this]
-    (js->clj (.. js/process -env))))
+    (json->edn js/process.env)))
 
 (defn env
   "Retrieve an environment variable by name, defaulting to `nil` if not found.
