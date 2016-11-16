@@ -2,13 +2,13 @@
   :description "FIXME"
   :url "http://please.FIXME"
   :dependencies [[org.clojure/clojure       "1.8.0"]
-                 [org.clojure/clojurescript "1.8.34"]
-                 [org.clojure/core.async    "0.2.374"]
-                 [io.nervous/cljs-lambda    "0.3.2"]]
+                 [org.clojure/clojurescript "1.8.51"]
+                 [org.clojure/core.async    "0.2.395"]
+                 [io.nervous/cljs-lambda    "0.3.3-SNAPSHOT"]]
   :plugins [[lein-cljsbuild "1.1.3"]
             [lein-npm       "0.6.0"]
-            [lein-doo       "0.1.7-SNAPSHOT"]
-            [io.nervous/lein-cljs-lambda "0.6.2"]]
+            [lein-doo       "0.1.7"]
+            [io.nervous/lein-cljs-lambda "0.6.3-SNAPSHOT"]]
   :npm {:dependencies [[source-map-support "0.4.0"]]}
   :source-paths ["src"]
   :cljs-lambda
