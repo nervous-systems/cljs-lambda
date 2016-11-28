@@ -1,4 +1,4 @@
-body {
+html body {
     font-family: "Merriweather", "PT Serif", Georgia, "Times New Roman", serif;
 }
 
@@ -8,15 +8,20 @@ body {
   text-align: center;
 }
 
-.sidebar, #content {
-  top: 8px;
+body .sidebar, body #content {
+  top: 0px;
 }
 
 #header {
   display: none;
 }
 
-.src-link a {
+.src-link {
+    background: none;
+    border: none;
+}
+
+body .src-link a {
     background: none;
     border: none;
     font-size: 95%;
@@ -30,42 +35,33 @@ body {
     margin-top: 0;
 }
 
-h1, h2, h3, h4 {
+body h1, body h2, body h3, body h4 {
     font-family: Lato;
     font-weight: normal;
 }
 
-.markdown pre, .markdown code, pre.deps {
+body .markdown pre, body .markdown pre > code, body pre.deps {
     background: none;
     border: none;
     font-size: inherit;
 }
 
-.markdown code {
-  margin: 0;
-}
-
-#header {
+body .markdown code:not(.hljs) {
+    margin: 0;
     background: none;
-    box-shadow: none;
-    color: black;
-}
-
-#header a {
-    color: black;
-    text-shadow: none;
 }
 
 .project-name {
     text-transform: lowercase;
 }
 
-.sidebar.primary, .sidebar.secondary {
+
+body .sidebar.primary, body .sidebar.secondary {
     background: none;
     border: none;
 }
 
-.namespace-docs h3, .namespace a, code, pre {
+body .namespace-docs h3, body .namespace a, body code, body pre {
     font-family: "Droid Sans Mono", monospace;
 }
 
@@ -73,16 +69,21 @@ h1, h2, h3, h4 {
     margin-bottom: 0px;
 }
 
-.public {
+body .public {
     border: none;
 }
 
 
-a, a span {
+body a, body a span {
     color: #0096cc;
     text-decoration: none;
 }
 
-.sidebar.secondary li.current a {
+body .sidebar.secondary li.current a {
     border-color: #0096cc;
+}
+
+.github img {
+    width: 160px;
+    opacity: 0.5;
 }
