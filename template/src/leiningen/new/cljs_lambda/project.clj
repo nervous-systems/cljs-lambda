@@ -4,11 +4,11 @@
   :dependencies [[org.clojure/clojure       "1.8.0"]
                  [org.clojure/clojurescript "1.8.51"]
                  [org.clojure/core.async    "0.2.395"]
-                 [io.nervous/cljs-lambda    "0.3.3-SNAPSHOT"]]
-  :plugins [[lein-cljsbuild "1.1.3"]
+                 [io.nervous/cljs-lambda    "0.3.3"]]
+  :plugins [[lein-cljsbuild "1.1.4"]
             [lein-npm       "0.6.0"]
             [lein-doo       "0.1.7"]
-            [io.nervous/lein-cljs-lambda "0.6.3-SNAPSHOT"]]
+            [io.nervous/lein-cljs-lambda "0.6.3"]]
   :npm {:dependencies [[source-map-support "0.4.0"]]}
   :source-paths ["src"]
   :cljs-lambda
