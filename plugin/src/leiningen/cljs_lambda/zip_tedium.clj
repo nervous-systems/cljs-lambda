@@ -63,8 +63,10 @@
 
 (defn write-zip [{:keys [output-dir] :as compiler-opts}
                  {:keys [project-name zip-name resource-dirs] :as spec}]
-  (let [zip-file (io/file output-dir zip-name)
-        path (.getAbsolutePath zip-file)]
+  (let [zip-file (if (spec :force-path)
+                   (io/file (spec :force-path))
+                   (io/file output-dir zip-name))
+        path     (.getAbsolutePath zip-file)]
     (log :verbose "Writing zip to" path)
     (.delete zip-file)
     (let [zip-stream (ZipArchiveOutputStream. zip-file)]
