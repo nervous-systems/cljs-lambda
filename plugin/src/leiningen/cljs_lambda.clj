@@ -136,10 +136,11 @@
                           (write-index output-dir))]
     (write-zip
      compiler
-     {:project-name project-name
-      :index-path index-path
+     {:project-name  project-name
+      :index-path    index-path
       :resource-dirs resource-dirs
-      :zip-name (str project-name ".zip")})))
+      :zip-name      (str project-name ".zip")
+      :force-path    (-> opts :keyword-args :output)})))
 
 (defn deploy
   "Build & deploy a zip file to Lambda, exposing the specified functions"
