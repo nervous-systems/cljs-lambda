@@ -140,7 +140,8 @@
       :index-path    index-path
       :resource-dirs resource-dirs
       :zip-name      (str project-name ".zip")
-      :force-path    (-> opts :keyword-args :output)})))
+      :force-path    (-> opts :keyword-args :output)
+      :print-files   (-> opts :keyword-args :print-files)})))
 
 (defn deploy
   "Build & deploy a zip file to Lambda, exposing the specified functions"
@@ -193,7 +194,7 @@
 
   ([project subtask & args]
    (if-let [subtask-fn (task->fn subtask)]
-     (let [[pos kw]    (args/split-args args #{:publish :quiet :managed-deps})
+     (let [[pos kw]    (args/split-args args #{:publish :quiet :managed-deps :print-files})
            [kw quiet]  [(dissoc kw :quiet) (kw :quiet)]
            project     (augment-project project pos kw)
            meta-config (-> project :cljs-lambda :meta-config)]
