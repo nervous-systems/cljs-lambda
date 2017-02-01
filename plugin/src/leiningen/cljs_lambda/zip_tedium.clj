@@ -7,6 +7,9 @@
            [org.apache.commons.compress.archivers.zip ZipArchiveEntry
                                                       ZipArchiveOutputStream]))
 
+;; I don't have time to explain
+(def ^:dynamic *print-files* false)
+
 (defn- get-posix-mode [file]
   (let [no-follow (into-array [LinkOption/NOFOLLOW_LINKS])
         perms (Files/getPosixFilePermissions (.toPath file) no-follow)]
@@ -24,6 +27,9 @@
 (defn- zip-entry [zip-stream file & [path]]
   (let [path  (or path (.getPath file))
         entry (ZipArchiveEntry. file path)]
+    (when *print-files*
+      (println (.getAbsolutePath file))
+      (println path))
     (.setUnixMode entry (get-posix-mode file))
     (.putArchiveEntry zip-stream entry)
     (io/copy file zip-stream)
@@ -70,8 +76,9 @@
     (log :verbose "Writing zip to" path)
     (.delete zip-file)
     (let [zip-stream (ZipArchiveOutputStream. zip-file)]
-      (stuff-zip zip-stream compiler-opts spec)
-      (doseq [d resource-dirs]
-        (zip-resources zip-stream (io/file d)))
+      (binding [*print-files* (spec :print-files)]
+        (stuff-zip zip-stream compiler-opts spec)
+        (doseq [d resource-dirs]
+          (zip-resources zip-stream (io/file d))))
       (.close zip-stream)
       path)))
