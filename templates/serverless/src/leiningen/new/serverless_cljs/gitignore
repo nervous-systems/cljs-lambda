@@ -1,0 +1,8 @@
+pom.xml
+*jar
+/lib/
+/classes/
+/out/
+/target/
+.lein*
+/node_modules

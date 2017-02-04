@@ -9,7 +9,8 @@ before_install:
 - nvm install 5
 - pushd cljs-lambda; lein install; popd
 - pushd plugin;      lein install; popd
-- pushd template;    lein install; popd
+- pushd templates/cljs-lambda; lein install; popd
+- pushd templates/serverless;  lein install; popd
 - lein new cljs-lambda $PROJECT_DIR $SNAPSHOT
 - cp -r travis/* $PROJECT_DIR
 - pushd cljs-lambda
