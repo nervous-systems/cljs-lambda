@@ -1,6 +1,8 @@
 (ns cljs-lambda.macros
-  (:require #? (:clj  [clojure.tools.macro :as macro]
-                :cljs [cljs-lambda.util]))
+  (:require [promesa.core :as p]
+            #? (:clj  [clojure.tools.macro :as macro]
+                :cljs [cljs-lambda.util])
+            #? (:cljs [cljs-lambda.aws.event]))
   #? (:cljs (:require-macros [cljs-lambda.macros])))
 
 #? (:clj
@@ -28,3 +30,26 @@
           (cljs-lambda.util/async-lambda-fn
            (fn ~bindings
              ~@body))))))
+
+#? (:clj
+    (defmacro defgateway
+      "Variant of [[deflambda]] which uses [[cljs-lambda.aws.event]] to translate the
+  first input and eventual output as maps describing API Gateway requests and
+  responses.  Does nothing to errors.
+
+```clojure
+(defgateway echo [event ctx]
+  {:status  200
+   :headers {:content-type (-> event :headers :content-type)}
+   :body    (event :body)})
+```"
+      [name & body]
+      (let [[name [bindings & body]] (macro/name-with-attributes name body)]
+        `(def ~(vary-meta name assoc :export true)
+           (cljs-lambda.util/async-lambda-fn
+            (fn [~'event & ~'args]
+              (p/then (cljs-lambda.util/invoke-async
+                       #(apply (fn ~bindings ~@body)
+                               (cljs-lambda.aws.event/aws->cljs ~'event)
+                               ~'event ~'args))
+                cljs-lambda.aws.event/cljs->aws)))))))
