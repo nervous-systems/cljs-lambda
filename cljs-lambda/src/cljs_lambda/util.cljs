@@ -28,7 +28,7 @@
 (defn- error? [x]
   (instance? js/Error x))
 
-(defn- invoke-async [f & args]
+(defn ^:no-doc invoke-async [f & args]
   (p/promise
    (fn [resolve reject]
      (let [handle #(if (error? %) (reject %) (resolve %))]

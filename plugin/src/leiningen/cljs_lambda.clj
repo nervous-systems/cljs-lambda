@@ -120,15 +120,17 @@
   [{{:keys [cljs-build cljs-build-id functions resource-dirs env] :as opts} :cljs-lambda
     :as project}]
   (if (or (opts :managed-deps) (-> opts :keyword-args :managed-deps))
-    (log :verbose "Note: You set the :managed-deps options to true, so dependencies won't be handled automatically.")
+    (log :verbose "Note: You set the :managed-deps options to true, so
+    dependencies won't be handled automatically.")
     (if (.exists (io/as-file "package.json"))
-      (main/abort "Your project already has a project.json file. Please remove it and use :npm {:dependencies [...]} option instead, or set :manage-deps to true and manage your dependencies manually.")
+      (main/abort "Your project already has a project.json file. Please remove
+      it and use :npm {:dependencies [...]} option instead, or set :manage-deps
+      to true and manage your dependencies manually.")
       (log :verbose
         (with-out-str
           (npm/npm project "install")))))
-  (log :verbose
-    (with-out-str
-     (cljsbuild/cljsbuild project "once" (:id cljs-build))))
+  (with-out-str
+    (cljsbuild/cljsbuild project "once" (:id cljs-build)))
   (let [{{:keys [output-dir optimizations] :as compiler} :compiler} cljs-build
         project-name (-> project :name name)
         index-path   (->> functions
