@@ -119,7 +119,7 @@
       (update :region keyword)))
 
 (defmulti to-aws*
-  "Interpret input map `event` as a Serverless event output.  The map's
+  "Interpret input map `event` as an AWS event output.  The map's
   `:aws.event/type` key will be used to inform transformations."
   :aws.event/type)
 
@@ -129,7 +129,7 @@
 
 (defn to-aws
   "Inverse of [[from-aws]], for response/output events.  Defers
-  to [[to-aws*]] and removes `:aws.event/type`, on the assumption that the
+  to [[to-aws*]], and removes `:aws.event/type`, on the assumption that the
   returned map will be passed to AWS."
   [{:keys [aws.event/type] :as event}]
   (-> (to-aws* event)
