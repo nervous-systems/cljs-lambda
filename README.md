@@ -12,17 +12,21 @@ This README serves to document a [Leiningen
 plugin](https://github.com/nervous-systems/cljs-lambda/tree/master/plugin)
 (`lein-cljs-lambda`), template (`cljs-lambda`) and [small
 library](https://nervous.io/doc/cljs-lambda/) (`cljs-lambda`) to facilitate the
-writing, deployment & invocation of Clojurescript Lambda functions
+writing, deployment & invocation of Clojurescript Lambda functions.
+
+The plugin can deploy functions itself, or the
+excellent [Serverless](http://serverless.com) framework can be used,
+via
+[serverless-cljs-plugin](https://www.npmjs.com/package/serverless-cljs-plugin).
 
 ## Benefits
 
  - Low instance warmup penalty
- - Ability to specify execution roles and resource limits in project definition
  - Use promises, or asynchronous channels for deferred completion
  - `:optimizations` `:advanced` support, for smaller zip files*
  - Utilities for [testing Lambda entrypoints](https://nervous.io/doc/cljs-lambda/testing.html) off of EC2
- - [Parallel deployments](https://github.com/nervous-systems/cljs-lambda/wiki/Plugin-Reference)
  - Function publishing/versioning
+ - [Serverless](http://serverless.com) integration
 
 _N.B. If using advanced compilation alongside Node's standard library,
 something like
@@ -65,6 +69,14 @@ $ lein cljs-lambda invoke work-magic \
   '{"spell": "delay-promise", "magic-word": "my-lambda-project-token"}'
 ...
 $ lein cljs-lambda update-config work-magic :memory-size 256 :timeout 66
+```
+
+## Serverless
+
+To generate a minimal project:
+
+```sh
+$ lein new serverless-cljs my-lambda-project
 ```
 
 # Documentation
