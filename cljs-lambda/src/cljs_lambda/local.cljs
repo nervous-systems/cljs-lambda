@@ -35,7 +35,7 @@
 ```
 
   By default, the values for the context keys will match the key names, more or
-  less, e.g. `{:function-name \"functionName\"}."
+  less, e.g. `{:function-name \"functionName\"}`."
   [& [key-overrides]]
   (map->LocalContext
    (merge ctx/context-keys
