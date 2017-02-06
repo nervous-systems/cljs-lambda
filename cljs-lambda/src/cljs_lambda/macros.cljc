@@ -47,9 +47,11 @@
       (let [[name [bindings & body]] (macro/name-with-attributes name body)]
         `(def ~(vary-meta name assoc :export true)
            (cljs-lambda.util/async-lambda-fn
-            (fn [~'event & ~'args]
-              (p/then (cljs-lambda.util/invoke-async
-                       #(apply (fn ~bindings ~@body)
-                               (cljs-lambda.aws.event/aws->cljs ~'event)
-                               ~'event ~'args))
-                cljs-lambda.aws.event/cljs->aws)))))))
+            (fn [event# & args#]
+              (let [event# (-> (assoc event# :aws.event/type :api-gateway)
+                               cljs-lambda.aws.event/from-aws)]
+                (p/then (apply cljs-lambda.util/invoke-async
+                               (fn ~bindings ~@body)
+                               (conj args# event#))
+                  (comp cljs-lambda.aws.event/to-aws
+                        #(assoc % :aws.event/type :api-gateway))))))))))
