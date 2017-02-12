@@ -4,8 +4,9 @@
   (:import [java.io File]
            [java.nio.file Files LinkOption]
            [java.nio.file.attribute PosixFilePermission]
-           [org.apache.commons.compress.archivers.zip ZipArchiveEntry
-                                                      ZipArchiveOutputStream]))
+           [org.apache.commons.compress.archivers.zip
+            ZipArchiveEntry
+            ZipArchiveOutputStream]))
 
 ;; I don't have time to explain
 (def ^:dynamic *print-files* false)
@@ -55,17 +56,20 @@
           (zip-entry zip-stream file path))))))
 
 (defmulti  stuff-zip (fn [_ {:keys [optimizations]} _] optimizations))
+
+(derive ::advanced ::single-file)
+(derive ::simple   ::single-file)
+
 (defmethod stuff-zip :default [zip-stream {:keys [output-dir]} {:keys [index-path]}]
   (zip-entry zip-stream (io/file index-path) "index.js")
   (zip-below zip-stream (io/file output-dir))
   (zip-below zip-stream (io/file "node_modules")))
 
-(defmethod stuff-zip :advanced [zip-stream {:keys [output-to source-map]} {:keys [index-path]}]
+(defmethod stuff-zip ::single-file [zip-stream {:keys [output-to source-map]} {:keys [index-path]}]
   (zip-entry zip-stream (io/file index-path) "index.js")
   (zip-entry zip-stream (io/file output-to))
   (when (string? source-map)
-    (zip-entry zip-stream (io/file source-map)))
-  (zip-below zip-stream (io/file "node_modules")))
+    (zip-entry zip-stream (io/file source-map))))
 
 (defn write-zip [{:keys [output-dir] :as compiler-opts}
                  {:keys [project-name zip-name resource-dirs] :as spec}]

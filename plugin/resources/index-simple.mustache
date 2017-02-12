@@ -1,0 +1,18 @@
+{{#source-map}}
+try {
+    require("source-map-support").install();
+} catch(err) {
+}
+{{/source-map}}
+
+{{#env}}
+process.env.{{key}} = "{{value}}";
+{{/#env}}
+
+var __CLJS_LAMBDA_NS_ROOT = require("./{{output-to}}");
+
+{{#module}}
+{{#function}}
+exports.{{export}} = __CLJS_LAMBDA_NS_ROOT.{{js-name}};
+{{/function}}
+{{/module}}
