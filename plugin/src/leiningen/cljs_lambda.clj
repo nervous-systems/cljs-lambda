@@ -27,9 +27,7 @@
 
 (defn- generate-index [env {:keys [optimizations source-map] :as compiler-opts} fns]
   (let [template (slurp (io/resource
-                         (if (= optimizations :advanced)
-                           "index-advanced.mustache"
-                           "index.mustache")))]
+                         (str "index-" (name optimizations) ".mustache")))]
     (clostache.parser/render
      template
      (assoc compiler-opts
