@@ -9,22 +9,24 @@
 * `:log-stream-name`
 * `:function-name`
 * `:function-arn`
-* `:identity` (optional)")
+* `:identity` (optional)
+* `:handler-callback` (optional)
+")
 
 (defn- json->edn [json]
   (js->clj (js/JSON.parse (js/JSON.stringify json))))
 
 (defprotocol ContextHandle
   (-done!
-   [this err result]
-   "See [[done!]]")
+    [this err result]
+    "See [[done!]]")
   (msecs-remaining
-   [this]
-   "The number of milliseconds remaining until the timeout of the invocation
+    [this]
+    "The number of milliseconds remaining until the timeout of the invocation
    associated with this context.")
   (environment
-   [this]
-   "Retrieve a map of environment variables."))
+    [this]
+    "Retrieve a map of environment variables."))
 
 (defrecord ^:no-doc LambdaContext [js-handle]
   ContextHandle
@@ -100,8 +102,10 @@
      :cognito-pool (.. id -cognitoIdentityPoolId)}))
 
 (defn ^:no-doc ->context [js-context]
-  (let [id (identity-map js-context)]
+  (let [id (identity-map js-context)
+        cb (.. js-context -handler-callback)]
     (cond-> (into (->LambdaContext js-context)
               (for [[us them] context-keys]
                 [us (aget js-context them)]))
-      id (assoc :identity id))))
+      id (assoc :identity id)
+      cb (assoc :handler-callback cb))))
