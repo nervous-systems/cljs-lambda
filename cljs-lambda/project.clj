@@ -1,4 +1,4 @@
-(defproject io.nervous/cljs-lambda "0.3.4"
+(defproject io.nervous/cljs-lambda "0.3.5-SNAPSHOT"
   :description "Clojurescript AWS Lambda utilities"
   :url         "https://github.com/nervous-systems/cljs-lambda"
   :license     {:name "Unlicense" :url "http://unlicense.org/UNLICENSE"}
@@ -28,7 +28,7 @@
                         :main          cljs-lambda.test.runner}}]}
   :codox
   {:metadata   {:doc/format :markdown}
-   :themes     [:default [:nervous {:nervous/github "https://github.com/nervous-systems/cljs-lambda/cljs-lambda"}]]
+   :themes     [:default [:nervous {:nervous/github "https://github.com/nervous-systems/cljs-lambda/"}]]
    :language   :clojurescript
    :source-uri ~(str "https://github.com/nervous-systems/cljs-lambda/"
                      "blob/master/cljs-lambda/{filepath}#L{line}")})

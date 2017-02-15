@@ -17,7 +17,11 @@
   `:log-stream-name` & `:function-name` - suitable for manipulation
   by [[context/done!]]  etc."
   [f]
-  (fn [event ctx]
+  (fn [event ctx & [cb]]
+    (when (fn? cb)
+      (set! (.. ctx -handler-callback)
+            (fn [err & [value]]
+              (cb (clj->js err) (clj->js value)))))
     (f (js->clj event :keywordize-keys true)
        (cond-> ctx
          (not (satisfies? ctx/ContextHandle ctx)) ctx/->context))))
@@ -65,6 +69,9 @@
   Lambda-specific ([[context/fail!]], etc.) functionality within the body.
   Optional error handler behaves as [[handle-errors]].
 
+  If the handler was passed a callback by the Lambda harness, that function will
+  be used to signal completion, over the the context methods.
+
 Success:
 
 * Returns successful Promesa/Bluebird promise
@@ -99,7 +106,6 @@ Failure:
   (let [f (cond-> f error-handler (handle-errors error-handler))]
     (wrap-lambda-fn
      (fn [event ctx]
-       (-> (invoke-async f event ctx)
-           (p/branch
-             (partial ctx/succeed! ctx)
-             (partial ctx/fail!    ctx)))))))
+       (let [cb (or (:handler-callback ctx) (partial ctx/done! ctx))]
+         (-> (invoke-async f event ctx)
+             (p/branch (partial cb nil) cb)))))))
