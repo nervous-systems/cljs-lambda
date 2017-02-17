@@ -1,14 +1,15 @@
 (ns leiningen.cljs-lambda
-  (:require [clojure.java.io :as io]
-            [clojure.string :as str]
+  (:require [clojure.java.io     :as io]
+            [clojure.string      :as str]
             [leiningen.core.main :as main]
+            [leiningen.core.eval :as eval]
             [leiningen.cljs-lambda.zip-tedium :refer [write-zip]]
-            [leiningen.cljs-lambda.aws :as aws]
+            [leiningen.cljs-lambda.aws     :as aws]
             [leiningen.cljs-lambda.logging :as logging :refer [log]]
-            [leiningen.cljs-lambda.args :as args]
-            [leiningen.npm :as npm]
+            [leiningen.cljs-lambda.args    :as args]
+            [leiningen.npm       :as npm]
             [leiningen.cljsbuild :as cljsbuild]
-            [leiningen.change :as change]
+            [leiningen.change    :as change]
             [leiningen.cljsbuild.config :as cljsbuild.config]
             [clostache.parser])
   (:import [java.io File]))
@@ -45,14 +46,20 @@
 
 (def default-defaults {:create true :runtime "nodejs4.3"})
 
-(defn- extract-build [{{:keys [cljs-build-id]} :cljs-lambda :as project}]
-  (let [{:keys [builds]} (cljsbuild.config/extract-options project)
-        [build] (if-not cljs-build-id
-                  builds
-                  (filter #(= (:id %) cljs-build-id) builds))]
-    (cond (not build)   (leiningen.core.main/abort "Can't find cljsbuild build")
-          (build :main) (leiningen.core.main/abort "Can't deploy build w/ :main")
-          :else         build)))
+(defn- extract-build [{:keys [cljs-lambda] :as proj}]
+  (when-not (:compiler cljs-lambda)
+    (let [cljs-build-id    (:cljs-build-id cljs-lambda)
+          {:keys [builds]} (cljsbuild.config/extract-options proj)
+          [build] (if-not cljs-build-id
+                    builds
+                    (filter #(= (:id %) cljs-build-id) builds))]
+      (cond (not build)   (leiningen.core.main/abort "Can't find cljsbuild build")
+            (build :main) (leiningen.core.main/abort "Can't deploy build w/ :main")
+            :else         build))))
+
+(defn- extract-compile-opts [proj]
+  {:post [(or (nil? %) (and (coll? (:inputs %)) (map? (:options %))))]}
+  (some-> proj :cljs-lambda :compiler))
 
 (def fn-keys
   #{:name :create :region :memory-size :role :invoke :description :timeout
@@ -86,17 +93,21 @@
 (defn- augment-project
   [{:keys [cljs-lambda] :as project} function-names cli-kws]
   (let [build       (extract-build project)
+        cljsc       (extract-compile-opts project)
         meta-config (select-keys
                      (merge meta-defaults cljs-lambda cli-kws)
-                     #{:region :aws-profile :parallel})]
+                     #{:region :aws-profile :parallel})
+        opts        (assoc cljs-lambda
+                      :meta-config     meta-config
+                      :positional-args function-names
+                      :keyword-args    cli-kws
+                      :functions       (augment-fns cljs-lambda function-names cli-kws))]
+    (assert (and (or build cljsc) (not (and build cljsc))))
     (assoc project
       :cljs-lambda
-      (assoc cljs-lambda
-        :cljs-build      build
-        :meta-config     meta-config
-        :positional-args function-names
-        :keyword-args    cli-kws
-        :functions       (augment-fns cljs-lambda function-names cli-kws)))))
+      (cond-> opts
+        build (assoc :cljs-build build :compiler (build :compiler))
+        cljsc (assoc :cljsc cljsc :compiler (cljsc :options))))))
 
 (defn- ->string-matcher [x]
   (cond
@@ -113,9 +124,19 @@
              (for [[k v] set-vars]
                [(name k) v])))))
 
+(defn- compile-cljs [proj]
+  (if-let [opts (-> proj :cljs-lambda :cljsc)]
+    (do
+      (log :verbose "Invoking Clojurescript compiler w/ inputs " (opts :inputs))
+      (eval/eval-in-project
+       proj
+       `(cljs.build.api/build (apply cljs.build.api/inputs ~(opts :inputs)) ~(opts :options))
+       `(require '[cljs.build.api])))
+    (cljsbuild/cljsbuild proj "once" (-> proj :cljs-lambda :cljs-build :id))))
+
 (defn build
   "Write a zip file suitable for Lambda deployment"
-  [{{:keys [cljs-build cljs-build-id functions resource-dirs env] :as opts} :cljs-lambda
+  [{{:keys [functions resource-dirs env] :as opts} :cljs-lambda
     :as project}]
   (if (or (opts :managed-deps) (-> opts :keyword-args :managed-deps))
     (log :verbose "Note: You set the :managed-deps options to true, so
@@ -128,14 +149,13 @@
         (with-out-str
           (npm/npm project "install")))))
   (with-out-str
-    (cljsbuild/cljsbuild project "once" (:id cljs-build)))
-  (let [{{:keys [output-dir optimizations] :as compiler} :compiler} cljs-build
-        project-name (-> project :name name)
+    (compile-cljs project))
+  (let [project-name (-> project :name name)
         index-path   (->> functions
-                          (generate-index (capture-env env) compiler)
-                          (write-index output-dir))]
+                          (generate-index (capture-env env) (opts :compiler))
+                          (write-index (-> opts :compiler :output-dir)))]
     (write-zip
-     compiler
+     (opts :compiler)
      {:project-name  project-name
       :index-path    index-path
       :resource-dirs resource-dirs

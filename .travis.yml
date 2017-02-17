@@ -4,8 +4,9 @@ dist: trusty
 jdk:
 - oraclejdk8
 before_install:
+- sudo apt-get update
 - sudo pip install awscli
-- sudo apt-get install parallel
+- which parallel || sudo apt-get install parallel
 - nvm install 5
 - pushd cljs-lambda; lein install; popd
 - pushd plugin;      lein install; popd
