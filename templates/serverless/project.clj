@@ -1,4 +1,4 @@
-(defproject serverless-cljs/lein-template "0.1.0"
+(defproject serverless-cljs/lein-template "0.1.1-SNAPSHOT"
   :description "Clojurescript on AWS Lambda via Serverless"
   :url         "https://github.com/nervous-systems/cljs-lambda"
   :license     {:name "Unlicense" :url "http://unlicense.org/UNLICENSE"}

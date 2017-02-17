@@ -5,7 +5,7 @@
   :dependencies [[lein-cljsbuild "1.1.4"]
                  [lein-npm       "0.6.2"]
                  [base64-clj     "0.1.1"]
-                 [de.ubercode.clostache/clostache "1.4.0"]
+                 [de.ubercode.clostache/clostache     "1.4.0"]
                  [org.apache.commons/commons-compress "1.11"]]
-  :exclusions [org.clojure/clojure]
+  :exclusions    [org.clojure/clojure]
   :eval-in-leiningen true)
