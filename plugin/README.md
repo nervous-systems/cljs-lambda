@@ -61,6 +61,7 @@ invoked.  An example:
  :timeout 3 ;; seconds
  :memory-size 128 ;; MB
  :vpc { :subnets [] :security-groups [] }
+ :dead-letter "arn:..."
 ```
 
 The wiki's [plugin
