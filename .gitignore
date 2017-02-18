@@ -12,3 +12,5 @@ pom.xml.asc
 node_modules
 .hg/
 out
+.idea
+*.iml
