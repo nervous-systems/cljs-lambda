@@ -26,6 +26,11 @@
     args/*region*      (assoc :region  (name args/*region*))
     args/*aws-profile* (assoc :profile (name args/*aws-profile*))))
 
+(defn update-dead-letter-value [{:keys [dead-letter] :as fn-spec}]
+  (if-not dead-letter
+    fn-spec
+    (merge fn-spec {:dead-letter (str "TargetArn=" dead-letter)})))
+
 (defn update-vpc-value [{:keys [vpc] :as fn-spec}]
   (if-not vpc
     fn-spec
@@ -39,9 +44,9 @@
                               "]"])}))))
 
 (defn ->cli-args [m & [positional {:keys [preserve-names?]}]]
-  (let [m    (cond-> (merge (meta-config) (update-vpc-value m))
+  (let [m    (cond-> (merge (meta-config) (-> m (update-vpc-value) (update-dead-letter-value)))
                (not preserve-names?)
-               (set/rename-keys {:name :function-name :vpc :vpc-config}))
+               (set/rename-keys {:name :function-name :vpc :vpc-config :dead-letter :dead-letter-config}))
         args (flatten
               (for [[k v] m]
                 [(str "--" (name k))
@@ -59,14 +64,17 @@
 (def lambda-cli! (partial aws-cli! "lambda"))
 
 (def fn-config-args
-  #{:name :role :handler :description :timeout :memory-size :runtime :vpc})
+  #{:name :role :handler :description :timeout :memory-size :runtime :vpc :dead-letter})
+
+(def fn-spec-defaults
+  {:vpc {:subnets [] :security-groups []} :dead-letter ""})
 
 (def create-function-args
   (into fn-config-args
     #{:zip-file :output :query}))
 
 (def update-function-code-args
-  (remove #{:vpc} create-function-args))
+  (remove #{:vpc :dead-letter} create-function-args))
 
 (defn validate-fn-spec! [{fn-name :name vpc :vpc}]
   (let [subnets (:subnets vpc)
@@ -121,7 +129,7 @@
 (defn- update-function-config! [fn-spec]
   (lambda-cli!
    :update-function-configuration
-   (-> (merge {:vpc {:subnets [] :security-groups []}} fn-spec)
+   (-> (merge fn-spec-defaults fn-spec)
        (select-keys fn-config-args)
        ->cli-args)))
 
@@ -149,17 +157,19 @@
       (update-in [:vpc :security-groups] sort)))
 
 (defn remote-config->local-config [remote]
-  (let [remote (set/rename-keys remote {:function-name :name :vpc-config :vpc})]
-    (if-let [vpc (:vpc remote)]
-      (assoc remote :vpc
-        (-> vpc
-            (select-keys #{:subnet-ids :security-group-ids})
-            (set/rename-keys {:subnet-ids :subnets :security-group-ids :security-groups})))
-      remote)))
+  (let [remote (set/rename-keys remote {:function-name :name :vpc-config :vpc :dead-letter-config :dead-letter})]
+    (merge
+      remote
+      (if-let [vpc (:vpc remote)]
+        (assoc remote :vpc
+          (-> vpc
+              (select-keys #{:subnet-ids :security-group-ids})
+              (set/rename-keys {:subnet-ids :subnets :security-group-ids :security-groups}))))
+      {:dead-letter (get-in remote [:dead-letter :target-arn] "")})))
 
 (defn same-config? [remote local]
   (let [remote (-> remote remote-config->local-config normalize-config)
-        local  (-> local (select-keys fn-config-args) normalize-config)]
+        local  (-> (merge fn-spec-defaults local) (select-keys fn-config-args) normalize-config)]
     (= (select-keys remote (keys local)) local)))
 
 (defn- deploy-function!
