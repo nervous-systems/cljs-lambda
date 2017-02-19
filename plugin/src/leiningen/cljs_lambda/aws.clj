@@ -152,7 +152,8 @@
 (defn normalize-config [config]
   (-> config
       (update-in [:vpc :subnets] sort)
-      (update-in [:vpc :security-groups] sort)))
+      (update-in [:vpc :security-groups] sort)
+      (update-in [:env] clojure.walk/stringify-keys)))
 
 (defn remote-config->local-config [remote]
   (let [remote (set/rename-keys remote {"FunctionName" :name
