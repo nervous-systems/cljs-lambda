@@ -39,6 +39,15 @@
        (string/join "," security-groups)
        "]"])))
 
+(defmethod ->cli-arg-value :environment [k v]
+  (str
+    "Variables={"
+    (string/join
+      ","
+      (for [[k v] v]
+        (str k "=" v)))
+    "}"))
+
 (defmethod ->cli-arg-value :dead-letter-config [k v]
   (str "TargetArn=" (str v)))
 
@@ -52,7 +61,7 @@
 (defn ->cli-args [m & [positional {:keys [preserve-names?]}]]
   (let [m    (cond-> (merge (meta-config) m)
                (not preserve-names?)
-               (set/rename-keys {:name :function-name :vpc :vpc-config :dead-letter :dead-letter-config}))
+               (set/rename-keys {:name :function-name :vpc :vpc-config :dead-letter :dead-letter-config :env :environment}))
         args (flatten
                (for [[k v] m]
                  (->cli-arg k v)))]
@@ -69,17 +78,17 @@
 (def lambda-cli! (partial aws-cli! "lambda"))
 
 (def fn-config-args
-  #{:name :role :handler :description :timeout :memory-size :runtime :vpc :dead-letter})
+  #{:name :role :handler :description :timeout :memory-size :runtime :vpc :dead-letter :env})
 
 (def fn-spec-defaults
-  {:vpc {:subnets [] :security-groups []} :dead-letter ""})
+  {:vpc {:subnets [] :security-groups []} :dead-letter "" :env {}})
 
 (def create-function-args
   (into fn-config-args
     #{:zip-file :output :query}))
 
 (def update-function-code-args
-  (remove #{:vpc :dead-letter} create-function-args))
+  (remove #{:vpc :dead-letter :env} create-function-args))
 
 (defn validate-fn-spec! [{fn-name :name vpc :vpc}]
   (let [subnets (:subnets vpc)
@@ -154,7 +163,7 @@
                             {:fatal? false})]
     (case exit
       255 nil
-      0   (json/parse-string out csk/->kebab-case-keyword))))
+      0   (json/parse-string out))))
 
 (defn normalize-config [config]
   (-> config
@@ -162,15 +171,26 @@
       (update-in [:vpc :security-groups] sort)))
 
 (defn remote-config->local-config [remote]
-  (let [remote (set/rename-keys remote {:function-name :name :vpc-config :vpc :dead-letter-config :dead-letter})]
+  (let [remote (set/rename-keys remote {"FunctionName" :name
+                                        "VpcConfig" :vpc
+                                        "DeadLetterConfig" :dead-letter
+                                        "Environment" :env
+                                        "Description" :description
+                                        "Timeout" :timeout
+                                        "Handler" :handler
+                                        "Runtime" :runtime
+                                        "MemorySize" :memory-size
+                                        "Version" :version
+                                        "Role" :role})]
     (merge
       remote
       (if-let [vpc (:vpc remote)]
         (assoc remote :vpc
           (-> vpc
-              (select-keys #{:subnet-ids :security-group-ids})
-              (set/rename-keys {:subnet-ids :subnets :security-group-ids :security-groups}))))
-      {:dead-letter (get-in remote [:dead-letter :target-arn] "")})))
+              (select-keys #{:SubnetIds :SecurityGroupIds})
+              (set/rename-keys {:SubnetIds :subnets :SecurityGroupIds :security-groups}))))
+      {:dead-letter (get-in remote [:dead-letter "TargetArn"] "")}
+      {:env (-> (get-in remote [:env "Variables"] {}))})))
 
 (defn same-config? [remote local]
   (let [remote (-> remote remote-config->local-config normalize-config)
