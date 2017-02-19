@@ -62,7 +62,11 @@ invoked.  An example:
  :memory-size 128 ;; MB
  :vpc { :subnets [] :security-groups [] }
  :dead-letter "arn:..."
+ :env {"VAR_A" "VALUE_A"
+       "VAR_B" "VALUE_B"}
 ```
+
+**NOTE:** Environment variables are case sensitive. You can provide `VAR_A` and `VAR_a`. Just be careful.
 
 The wiki's [plugin
 reference](https://github.com/nervous-systems/cljs-lambda/wiki/Plugin-Reference)

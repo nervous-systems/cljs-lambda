@@ -8,7 +8,6 @@
             [clojure.string :as str]
             [base64-clj.core :as base64]
             [clojure.pprint :as pprint]
-            [camel-snake-kebab.core :as csk]
             [clojure.string :as string])
   (:import [java.io File]
            [java.util.concurrent Executors]))
@@ -26,31 +25,45 @@
     args/*region*      (assoc :region  (name args/*region*))
     args/*aws-profile* (assoc :profile (name args/*aws-profile*))))
 
-(defn update-dead-letter-value [{:keys [dead-letter] :as fn-spec}]
-  (if-not dead-letter
-    fn-spec
-    (merge fn-spec {:dead-letter (str "TargetArn=" dead-letter)})))
+(defmulti ->cli-arg-value
+  (fn [k v] k))
 
-(defn update-vpc-value [{:keys [vpc] :as fn-spec}]
-  (if-not vpc
-    fn-spec
-    (let [subnets (:subnets vpc)
-          security-groups (:security-groups vpc)]
-      (merge fn-spec {:vpc (string/join
-                             ["SubnetIds=["
-                              (string/join "," subnets)
-                              "],SecurityGroupIds=["
-                              (string/join "," security-groups)
-                              "]"])}))))
+(defmethod ->cli-arg-value :vpc-config [k v]
+  (let [subnets (:subnets v)
+        security-groups (:security-groups v)]
+    (string/join
+      ["SubnetIds=["
+       (string/join "," subnets)
+       "],SecurityGroupIds=["
+       (string/join "," security-groups)
+       "]"])))
+
+(defmethod ->cli-arg-value :environment [k v]
+  (str
+    "Variables={"
+    (string/join
+      ","
+      (for [[k v] v]
+        (str (name k) "=" v)))
+    "}"))
+
+(defmethod ->cli-arg-value :dead-letter-config [k v]
+  (str "TargetArn=" v))
+
+(defmethod ->cli-arg-value :default [k v]
+  (if (keyword? v) (name v) (str v)))
+
+(defn ->cli-arg [k v]
+  [(str "--" (name k))
+   (->cli-arg-value k v)])
 
 (defn ->cli-args [m & [positional {:keys [preserve-names?]}]]
-  (let [m    (cond-> (merge (meta-config) (-> m (update-vpc-value) (update-dead-letter-value)))
+  (let [m    (cond-> (merge (meta-config) m)
                (not preserve-names?)
-               (set/rename-keys {:name :function-name :vpc :vpc-config :dead-letter :dead-letter-config}))
+               (set/rename-keys {:name :function-name :vpc :vpc-config :dead-letter :dead-letter-config :env :environment}))
         args (flatten
-              (for [[k v] m]
-                [(str "--" (name k))
-                 (if (keyword? v) (name v) (str v))]))]
+               (for [[k v] m]
+                 (->cli-arg k v)))]
     (cond->> args positional (into positional))))
 
 (defn aws-cli! [service cmd args & [{:keys [fatal?] :or {fatal? true}}]]
@@ -64,32 +77,17 @@
 (def lambda-cli! (partial aws-cli! "lambda"))
 
 (def fn-config-args
-  #{:name :role :handler :description :timeout :memory-size :runtime :vpc :dead-letter})
+  #{:name :role :handler :description :timeout :memory-size :runtime :vpc :dead-letter :env})
 
 (def fn-spec-defaults
-  {:vpc {:subnets [] :security-groups []} :dead-letter ""})
+  {:vpc {:subnets [] :security-groups []} :dead-letter "" :env {}})
 
 (def create-function-args
   (into fn-config-args
     #{:zip-file :output :query}))
 
 (def update-function-code-args
-  (remove #{:vpc :dead-letter} create-function-args))
-
-(defn validate-fn-spec! [{fn-name :name vpc :vpc}]
-  (let [subnets (:subnets vpc)
-        security-groups (:security-groups vpc)
-        vpc-set (or (seq subnets) (seq security-groups))]
-    (when vpc-set
-      (when-not (and (> (count subnets) 0) (> (count security-groups) 0))
-        (leiningen.core.main/abort
-          "Invalid VPC spec for" fn-name "function. At least one subnet and one security group must be specified"))
-      (when-not (every? string? subnets)
-        (leiningen.core.main/abort
-          "Invalid VPC spec for" fn-name "function. Subnets not a list of strings:" subnets))
-      (when-not (every? string? security-groups)
-        (leiningen.core.main/abort
-          "Invalid VPC spec for" fn-name "function. Security groups not a list of strings:" security-groups)))))
+  (remove #{:vpc :dead-letter :env} create-function-args))
 
 (defn fn-spec->cli-args [fn-args {:keys [publish] :as fn-spec}]
   (let [args (merge {:output "text" :query "Version"} fn-spec)]
@@ -149,23 +147,35 @@
                             {:fatal? false})]
     (case exit
       255 nil
-      0   (json/parse-string out csk/->kebab-case-keyword))))
+      0   (json/parse-string out))))
 
 (defn normalize-config [config]
   (-> config
       (update-in [:vpc :subnets] sort)
-      (update-in [:vpc :security-groups] sort)))
+      (update-in [:vpc :security-groups] sort)
+      (update-in [:env] clojure.walk/stringify-keys)))
 
 (defn remote-config->local-config [remote]
-  (let [remote (set/rename-keys remote {:function-name :name :vpc-config :vpc :dead-letter-config :dead-letter})]
+  (let [remote (set/rename-keys remote {"FunctionName" :name
+                                        "VpcConfig" :vpc
+                                        "DeadLetterConfig" :dead-letter
+                                        "Environment" :env
+                                        "Description" :description
+                                        "Timeout" :timeout
+                                        "Handler" :handler
+                                        "Runtime" :runtime
+                                        "MemorySize" :memory-size
+                                        "Version" :version
+                                        "Role" :role})]
     (merge
       remote
       (if-let [vpc (:vpc remote)]
         (assoc remote :vpc
           (-> vpc
-              (select-keys #{:subnet-ids :security-group-ids})
-              (set/rename-keys {:subnet-ids :subnets :security-group-ids :security-groups}))))
-      {:dead-letter (get-in remote [:dead-letter :target-arn] "")})))
+              (select-keys #{"SubnetIds" "SecurityGroupIds"})
+              (set/rename-keys {"SubnetIds" :subnets "SecurityGroupIds" :security-groups}))))
+      {:dead-letter (get-in remote [:dead-letter "TargetArn"] "")}
+      {:env (-> (get-in remote [:env "Variables"] {}))})))
 
 (defn same-config? [remote local]
   (let [remote (-> remote remote-config->local-config normalize-config)
@@ -174,7 +184,6 @@
 
 (defn- deploy-function!
   [zip-path {fn-name :name create? :create :as fn-spec}]
-  (validate-fn-spec! fn-spec)
   (if-let [remote-config (get-function-configuration! fn-spec)]
     (do
       (when-not (same-config? remote-config fn-spec)
