@@ -171,8 +171,8 @@
       (if-let [vpc (:vpc remote)]
         (assoc remote :vpc
           (-> vpc
-              (select-keys #{:SubnetIds :SecurityGroupIds})
-              (set/rename-keys {:SubnetIds :subnets :SecurityGroupIds :security-groups}))))
+              (select-keys #{"SubnetIds" "SecurityGroupIds"})
+              (set/rename-keys {"SubnetIds" :subnets "SecurityGroupIds" :security-groups}))))
       {:dead-letter (get-in remote [:dead-letter "TargetArn"] "")}
       {:env (-> (get-in remote [:env "Variables"] {}))})))
 
