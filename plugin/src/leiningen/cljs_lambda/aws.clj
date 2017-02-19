@@ -48,7 +48,7 @@
     "}"))
 
 (defmethod ->cli-arg-value :dead-letter-config [k v]
-  (str "TargetArn=" (str v)))
+  (str "TargetArn=" v))
 
 (defmethod ->cli-arg-value :default [k v]
   (if (keyword? v) (name v) (str v)))
