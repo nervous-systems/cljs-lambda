@@ -44,7 +44,7 @@
     (string/join
       ","
       (for [[k v] v]
-        (str k "=" v)))
+        (str (name k) "=" v)))
     "}"))
 
 (defmethod ->cli-arg-value :dead-letter-config [k v]
