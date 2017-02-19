@@ -26,31 +26,36 @@
     args/*region*      (assoc :region  (name args/*region*))
     args/*aws-profile* (assoc :profile (name args/*aws-profile*))))
 
-(defn update-dead-letter-value [{:keys [dead-letter] :as fn-spec}]
-  (if-not dead-letter
-    fn-spec
-    (merge fn-spec {:dead-letter (str "TargetArn=" dead-letter)})))
+(defmulti ->cli-arg-value
+  (fn [k v] k))
 
-(defn update-vpc-value [{:keys [vpc] :as fn-spec}]
-  (if-not vpc
-    fn-spec
-    (let [subnets (:subnets vpc)
-          security-groups (:security-groups vpc)]
-      (merge fn-spec {:vpc (string/join
-                             ["SubnetIds=["
-                              (string/join "," subnets)
-                              "],SecurityGroupIds=["
-                              (string/join "," security-groups)
-                              "]"])}))))
+(defmethod ->cli-arg-value :vpc-config [k v]
+  (let [subnets (:subnets v)
+        security-groups (:security-groups v)]
+    (string/join
+      ["SubnetIds=["
+       (string/join "," subnets)
+       "],SecurityGroupIds=["
+       (string/join "," security-groups)
+       "]"])))
+
+(defmethod ->cli-arg-value :dead-letter-config [k v]
+  (str "TargetArn=" (str v)))
+
+(defmethod ->cli-arg-value :default [k v]
+  (if (keyword? v) (name v) (str v)))
+
+(defn ->cli-arg [k v]
+  [(str "--" (name k))
+   (->cli-arg-value k v)])
 
 (defn ->cli-args [m & [positional {:keys [preserve-names?]}]]
-  (let [m    (cond-> (merge (meta-config) (-> m (update-vpc-value) (update-dead-letter-value)))
+  (let [m    (cond-> (merge (meta-config) m)
                (not preserve-names?)
                (set/rename-keys {:name :function-name :vpc :vpc-config :dead-letter :dead-letter-config}))
         args (flatten
-              (for [[k v] m]
-                [(str "--" (name k))
-                 (if (keyword? v) (name v) (str v))]))]
+               (for [[k v] m]
+                 (->cli-arg k v)))]
     (cond->> args positional (into positional))))
 
 (defn aws-cli! [service cmd args & [{:keys [fatal?] :or {fatal? true}}]]
