@@ -90,21 +90,6 @@
 (def update-function-code-args
   (remove #{:vpc :dead-letter :env} create-function-args))
 
-(defn validate-fn-spec! [{fn-name :name vpc :vpc}]
-  (let [subnets (:subnets vpc)
-        security-groups (:security-groups vpc)
-        vpc-set (or (seq subnets) (seq security-groups))]
-    (when vpc-set
-      (when-not (and (> (count subnets) 0) (> (count security-groups) 0))
-        (leiningen.core.main/abort
-          "Invalid VPC spec for" fn-name "function. At least one subnet and one security group must be specified"))
-      (when-not (every? string? subnets)
-        (leiningen.core.main/abort
-          "Invalid VPC spec for" fn-name "function. Subnets not a list of strings:" subnets))
-      (when-not (every? string? security-groups)
-        (leiningen.core.main/abort
-          "Invalid VPC spec for" fn-name "function. Security groups not a list of strings:" security-groups)))))
-
 (defn fn-spec->cli-args [fn-args {:keys [publish] :as fn-spec}]
   (let [args (merge {:output "text" :query "Version"} fn-spec)]
     (-> args
@@ -199,7 +184,6 @@
 
 (defn- deploy-function!
   [zip-path {fn-name :name create? :create :as fn-spec}]
-  (validate-fn-spec! fn-spec)
   (if-let [remote-config (get-function-configuration! fn-spec)]
     (do
       (when-not (same-config? remote-config fn-spec)
