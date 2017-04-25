@@ -50,6 +50,13 @@
 (defmethod ->cli-arg-value :dead-letter-config [k v]
   (str "TargetArn=" v))
 
+(defmethod ->cli-arg-value :tracing-config [k v]
+  (str "Mode="
+       (case v
+         :active "Active"
+         :passthrough "PassThrough"
+         (leiningen.core.main/abort "Invalid :tracing value" v ", supported values are :active or :passthrough"))))
+
 (defmethod ->cli-arg-value :default [k v]
   (if (keyword? v) (name v) (str v)))
 
@@ -60,7 +67,7 @@
 (defn ->cli-args [m & [positional {:keys [preserve-names?]}]]
   (let [m    (cond-> (merge (meta-config) m)
                (not preserve-names?)
-               (set/rename-keys {:name :function-name :vpc :vpc-config :dead-letter :dead-letter-config :env :environment}))
+               (set/rename-keys {:tracing :tracing-config :name :function-name :vpc :vpc-config :dead-letter :dead-letter-config :env :environment}))
         args (flatten
                (for [[k v] m]
                  (->cli-arg k v)))]
@@ -77,17 +84,17 @@
 (def lambda-cli! (partial aws-cli! "lambda"))
 
 (def fn-config-args
-  #{:name :role :handler :description :timeout :memory-size :runtime :vpc :dead-letter :env})
+  #{:tracing :name :role :handler :description :timeout :memory-size :runtime :vpc :dead-letter :env})
 
 (def fn-spec-defaults
-  {:vpc {:subnets [] :security-groups []} :dead-letter "" :env {}})
+  {:tracing :passthrough :vpc {:subnets [] :security-groups []} :dead-letter "" :env {}})
 
 (def create-function-args
   (into fn-config-args
     #{:zip-file :output :query}))
 
 (def update-function-code-args
-  (remove #{:vpc :dead-letter :env} create-function-args))
+  (remove #{:vpc :dead-letter :env :tracing} create-function-args))
 
 (defn fn-spec->cli-args [fn-args {:keys [publish] :as fn-spec}]
   (let [args (merge {:output "text" :query "Version"} fn-spec)]
@@ -166,6 +173,7 @@
                                         "Runtime" :runtime
                                         "MemorySize" :memory-size
                                         "Version" :version
+                                        "TracingConfig" :tracing
                                         "Role" :role})]
     (merge
       remote
@@ -174,6 +182,9 @@
           (-> vpc
               (select-keys #{"SubnetIds" "SecurityGroupIds"})
               (set/rename-keys {"SubnetIds" :subnets "SecurityGroupIds" :security-groups}))))
+      {:tracing (-> (get-in remote [:tracing "Mode"])
+                    (string/lower-case)
+                    (keyword))}
       {:dead-letter (get-in remote [:dead-letter "TargetArn"] "")}
       {:env (-> (get-in remote [:env "Variables"] {}))})))
 
