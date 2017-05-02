@@ -55,17 +55,18 @@
         (when-not (.isDirectory file)
           (zip-entry zip-stream file path))))))
 
-(defmulti  stuff-zip (fn [_ {:keys [optimizations]} _] optimizations))
-
-(derive ::advanced ::single-file)
-(derive ::simple   ::single-file)
+(defmulti  stuff-zip
+  (fn [_ {:keys [optimizations]} _]
+    (if (#{:simple :advanced} optimizations)
+      :single-file
+      :default)))
 
 (defmethod stuff-zip :default [zip-stream {:keys [output-dir]} {:keys [index-path]}]
   (zip-entry zip-stream (io/file index-path) "index.js")
   (zip-below zip-stream (io/file output-dir))
   (zip-below zip-stream (io/file "node_modules")))
 
-(defmethod stuff-zip ::single-file [zip-stream {:keys [output-to source-map]} {:keys [index-path]}]
+(defmethod stuff-zip :single-file [zip-stream {:keys [output-to source-map]} {:keys [index-path]}]
   (zip-entry zip-stream (io/file index-path) "index.js")
   (zip-entry zip-stream (io/file output-to))
   (when (string? source-map)
