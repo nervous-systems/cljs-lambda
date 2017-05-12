@@ -8,7 +8,7 @@
   :plugins [[lein-cljsbuild "1.1.4"]
             [lein-npm       "0.6.0"]
             [lein-doo       "0.1.7"]
-            [io.nervous/lein-cljs-lambda "0.6.5"]]
+            [io.nervous/lein-cljs-lambda "0.6.6"]]
   :npm {:dependencies [[source-map-support "0.4.0"]]}
   :source-paths ["src"]
   :cljs-lambda

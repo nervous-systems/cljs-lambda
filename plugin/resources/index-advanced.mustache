@@ -9,10 +9,10 @@ try {
 process.env.{{key}} = "{{value}}";
 {{/#env}}
 
-var __CLJS_LAMBDA_NS_ROOT = require("./{{output-to}}");
+require("./{{output-to}}");
 
 {{#module}}
 {{#function}}
-exports.{{export}} = __CLJS_LAMBDA_NS_ROOT.{{js-name}};
+exports.{{export}} = {{js-name}};
 {{/function}}
 {{/module}}
