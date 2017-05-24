@@ -59,7 +59,13 @@
 
 (defn- extract-compile-opts [proj]
   {:post [(or (nil? %) (and (coll? (:inputs %)) (map? (:options %))))]}
-  (some-> proj :cljs-lambda :compiler))
+  (some-> proj
+    :cljs-lambda
+    :compiler
+    (update :options (fn [{:keys [optimizations] :as options}]
+                       (if (= :advanced optimizations)
+                         (merge {:output-wrapper true} options)
+                         options)))))
 
 (def fn-keys
   #{:name :create :region :memory-size :role :invoke :description :timeout
