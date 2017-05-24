@@ -16,13 +16,13 @@
   keys `:aws-request-id`, `:client-context`, `:log-group-name`,
   `:log-stream-name` & `:function-name` - suitable for manipulation
   by [[context/done!]]  etc."
-  [f]
+  [f & [{parse-input? :parse-input? :or {parse-input? true}}]]
   (fn [event ctx & [cb]]
     (when (fn? cb)
       (set! (.. ctx -handler-callback)
             (fn [err & [value]]
               (cb (clj->js err) (clj->js value)))))
-    (f (js->clj event :keywordize-keys true)
+    (f (if parse-input? (js->clj event :keywordize-keys true) event)
        (cond-> ctx
          (not (satisfies? ctx/ContextHandle ctx)) ctx/->context))))
 
@@ -102,10 +102,11 @@ Failure:
 
   See [[macros/deflambda]] for an alternative approach to defining/export
   handler vars."
-  [f & [{:keys [error-handler]}]]
+  [f & [{:keys [error-handler] :as opts}]]
   (let [f (cond-> f error-handler (handle-errors error-handler))]
     (wrap-lambda-fn
      (fn [event ctx]
        (let [cb (or (:handler-callback ctx) (partial ctx/done! ctx))]
          (-> (invoke-async f event ctx)
-             (p/branch (partial cb nil) cb)))))))
+             (p/branch (partial cb nil) cb))))
+     opts)))
