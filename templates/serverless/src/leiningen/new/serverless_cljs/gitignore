@@ -6,3 +6,4 @@ pom.xml
 /target/
 .lein*
 /node_modules
+.serverless/
