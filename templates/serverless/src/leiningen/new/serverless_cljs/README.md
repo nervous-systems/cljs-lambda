@@ -1,5 +1,11 @@
 # {{name}}
 
+# Install Dependencies
+
+```shell
+$ lein deps
+```
+
 # Deploy
 
 ```shell
