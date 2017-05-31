@@ -181,6 +181,11 @@
   [{:keys [cljs-lambda] :as project}]
   (aws/update-configs! cljs-lambda))
 
+(defn dump-config
+  "Dump effective function configs"
+  [{:keys [cljs-lambda] :as project}]
+  (aws/dump-configs! cljs-lambda))
+
 (defn invoke
   "Invoke the named Lambda function"
   [{{:keys [positional-args] :as cljs-lambda} :cljs-lambda}]
@@ -209,18 +214,19 @@
    "deploy" deploy
    "invoke" invoke
    "default-iam-role" default-iam-role
-   "update-config"    update-config})
+   "update-config"    update-config
+   "dump-config"      dump-config})
 
 (defn cljs-lambda
   "Build & deploy AWS Lambda functions"
-  {:help-arglists '([alias build deploy update-config invoke default-iam-role])
-   :subtasks [#'create-alias #'build #'deploy #'update-config #'invoke #'default-iam-role]}
+  {:help-arglists '([alias build deploy update-config dump-config invoke default-iam-role])
+   :subtasks [#'create-alias #'build #'deploy #'update-config #'dump-config #'invoke #'default-iam-role]}
 
   ([project] (println (leiningen.help/help-for cljs-lambda)))
 
   ([project subtask & args]
    (if-let [subtask-fn (task->fn subtask)]
-     (let [[pos kw]    (args/split-args args #{:publish :quiet :managed-deps :print-files})
+     (let [[pos kw]    (args/split-args args #{:publish :quiet :managed-deps :print-files :pretty})
            [kw quiet]  [(dissoc kw :quiet) (kw :quiet)]
            project     (augment-project project pos kw)
            meta-config (-> project :cljs-lambda :meta-config)]
