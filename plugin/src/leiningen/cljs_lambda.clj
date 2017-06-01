@@ -1,6 +1,7 @@
 (ns leiningen.cljs-lambda
   (:require [clojure.java.io     :as io]
             [clojure.string      :as str]
+            [cheshire.core :as json]
             [leiningen.core.main :as main]
             [leiningen.core.eval :as eval]
             [leiningen.cljs-lambda.zip-tedium :refer [write-zip]]
@@ -183,8 +184,11 @@
 
 (defn dump-config
   "Dump effective function configs"
-  [{:keys [cljs-lambda] :as project}]
-  (aws/dump-configs! cljs-lambda))
+  [{{:keys [keyword-args] :as cljs-lambda} :cljs-lambda}]
+  (-> cljs-lambda
+      (select-keys [:functions])
+      (json/generate-string (select-keys keyword-args [:pretty]))
+      println))
 
 (defn invoke
   "Invoke the named Lambda function"

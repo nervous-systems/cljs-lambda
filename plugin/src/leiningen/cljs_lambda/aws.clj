@@ -229,13 +229,6 @@
         (update-function-config! fn-spec))
       (leiningen.core.main/abort fn-name "doesn't exist & can't create"))))
 
-(defn dump-configs! [{:keys [keyword-args] :as cljs-lambda}]
-  (-> cljs-lambda
-      (select-keys [:functions])
-      (json/generate-string (select-keys keyword-args [:pretty]))
-      println)
-  cljs-lambda)
-
 (defn update-configs! [cljs-lambda]
   (do-functions! update-config! cljs-lambda))
 
