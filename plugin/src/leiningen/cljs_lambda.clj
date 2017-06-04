@@ -1,6 +1,7 @@
 (ns leiningen.cljs-lambda
   (:require [clojure.java.io     :as io]
             [clojure.string      :as str]
+            [cheshire.core :as json]
             [leiningen.core.main :as main]
             [leiningen.core.eval :as eval]
             [leiningen.cljs-lambda.zip-tedium :refer [write-zip]]
@@ -181,6 +182,14 @@
   [{:keys [cljs-lambda] :as project}]
   (aws/update-configs! cljs-lambda))
 
+(defn dump-config
+  "Dump effective function configs"
+  [{{:keys [keyword-args] :as cljs-lambda} :cljs-lambda}]
+  (-> cljs-lambda
+      (select-keys [:functions])
+      (json/generate-string (select-keys keyword-args [:pretty]))
+      println))
+
 (defn invoke
   "Invoke the named Lambda function"
   [{{:keys [positional-args] :as cljs-lambda} :cljs-lambda}]
@@ -209,18 +218,19 @@
    "deploy" deploy
    "invoke" invoke
    "default-iam-role" default-iam-role
-   "update-config"    update-config})
+   "update-config"    update-config
+   "dump-config"      dump-config})
 
 (defn cljs-lambda
   "Build & deploy AWS Lambda functions"
-  {:help-arglists '([alias build deploy update-config invoke default-iam-role])
-   :subtasks [#'create-alias #'build #'deploy #'update-config #'invoke #'default-iam-role]}
+  {:help-arglists '([alias build deploy update-config dump-config invoke default-iam-role])
+   :subtasks [#'create-alias #'build #'deploy #'update-config #'dump-config #'invoke #'default-iam-role]}
 
   ([project] (println (leiningen.help/help-for cljs-lambda)))
 
   ([project subtask & args]
    (if-let [subtask-fn (task->fn subtask)]
-     (let [[pos kw]    (args/split-args args #{:publish :quiet :managed-deps :print-files})
+     (let [[pos kw]    (args/split-args args #{:publish :quiet :managed-deps :print-files :pretty})
            [kw quiet]  [(dissoc kw :quiet) (kw :quiet)]
            project     (augment-project project pos kw)
            meta-config (-> project :cljs-lambda :meta-config)]
