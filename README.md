@@ -65,6 +65,11 @@ $ lein new cljs-lambda my-lambda-project
 $ cd my-lambda-project
 $ lein cljs-lambda default-iam-role
 $ lein cljs-lambda deploy
+### 500ms delay via a promise (try also "delay-channel" and "delay-fail")
+$ lein cljs-lambda invoke work-magic \
+  '{"spell": "delay-promise", "msecs": 500, "magic-word": "my-lambda-project-token"}'
+... {:waited 500}
+### Get environment varibles
 $ lein cljs-lambda invoke work-magic \
   '{"spell": "echo-env", "magic-word": "my-lambda-project-token"}'
 ...
