@@ -18,7 +18,7 @@ $ cd my-lambda-project
 $ lein cljs-lambda default-iam-role
 $ lein cljs-lambda deploy
 $ lein cljs-lambda invoke work-magic \
-  '{"spell": "black", "delay-promise": "my-lambda-project-token"}'
+  '{"spell": "echo-env", "magic-word": "my-lambda-project-token"}'
 ...
 $ lein cljs-lambda update-config work-magic :memory-size 256 :timeout 66
 ```
