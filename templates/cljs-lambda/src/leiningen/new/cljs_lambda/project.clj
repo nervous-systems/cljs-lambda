@@ -23,6 +23,7 @@
              :compiler {:output-to     "target/{{name}}/{{sanitized}}.js"
                         :output-dir    "target/{{name}}"
                         :source-map    true
+                        :process-shim  false
                         :target        :nodejs
                         :language-in   :ecmascript5
                         :optimizations :none}}
