@@ -27,14 +27,14 @@
   (environment
     [this]
     "Retrieve a map of environment variables.")
-  (callback-waits?
+  (waits?
     [this]
     "By default, the callback will wait until the Node.js runtime event loop is
     empty before freezing the process and returning the results to the caller.
     You can set this property to false to request AWS Lambda to freeze the
     process soon after the callback is called, even if there are events in the
     event loop.")
-  (set-callback-waits
+  (set-wait!
     [this tf]
     "Set the callback-waits"))
 
@@ -46,19 +46,20 @@
     (.getRemainingTimeInMillis js-handle))
   (environment [this]
     (json->edn js/process.env))
-  (callback-waits? [this]
+  (waits? [this]
     (.-callbackWaitsForEmptyEventLoop js-handle))
-  (set-callback-waits [this tf]
+  (set-wait! [this tf]
     (set! (.-callbackWaitsForEmptyEventLoop js-handle) tf)))
 
-(defn waits?
+(defn waits-on-event-loop?
   [ctx]
-  (prn ctx)
-  (callback-waits? ctx))
+  "Returns state of context property callbackWaitsForEmptyEventLoop"
+  (waits? ctx))
 
-(defn set-waits
+(defn set-wait-on-event-loop!
+  "Set the context property callbackWaitsForEmptyEventLoop"
   [ctx tf]
-  (set-callback-waits ctx tf))
+  (set-wait! ctx tf))
 
 (defn env
   "Retrieve an environment variable by name, defaulting to `nil` if not found.

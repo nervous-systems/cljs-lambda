@@ -148,7 +148,7 @@
   waits
   (let [f (lambda/async-lambda-fn
             (fn [_ ctx]
-              (ctx/waits? ctx)))]
+              (ctx/waits-on-event-loop? ctx)))]
     (p/then
       (invoke f)
       (will= true))))
@@ -157,7 +157,7 @@
   set-waits
   (let [f (lambda/async-lambda-fn
             (fn [_ ctx]
-              (ctx/set-waits ctx false)))]
+              (ctx/set-wait-on-event-loop! ctx false)))]
     (p/then
       (invoke f)
       (will= false))))

@@ -17,9 +17,9 @@
     -1)
   (environment [this]
     env)
-  (callback-waits? [this]
+  (waits? [this]
     true)
-  (set-callback-waits [this tf]
+  (set-wait! [this tf]
     tf))
 
 (defn- stringify-keys
