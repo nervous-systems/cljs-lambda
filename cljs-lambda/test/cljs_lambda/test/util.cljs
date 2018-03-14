@@ -143,3 +143,21 @@
         ctx (local/->context {:env {'ENV_VAR "deftest-async env"}})]
     (p/then (invoke f nil ctx)
       (will= "deftest-async env"))))
+
+(deftest-async
+  waits
+  (let [f (lambda/async-lambda-fn
+            (fn [_ ctx]
+              (ctx/waits? ctx)))]
+    (p/then
+      (invoke f)
+      (will= true))))
+
+(deftest-async
+  set-waits
+  (let [f (lambda/async-lambda-fn
+            (fn [_ ctx]
+              (ctx/set-waits ctx false)))]
+    (p/then
+      (invoke f)
+      (will= false))))
