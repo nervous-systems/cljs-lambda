@@ -5,6 +5,7 @@ context.clientContext;
 context.logGroupName;
 context.logStreamName;
 context.functionName;
+context.callbackWaitsForEmptyEventLoop;
 
 context.getMemoryLimitInMB = function() {};
 context.getFunctionName = function() {};

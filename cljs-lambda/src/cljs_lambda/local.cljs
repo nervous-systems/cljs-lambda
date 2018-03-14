@@ -16,7 +16,11 @@
   (msecs-remaining [this]
     -1)
   (environment [this]
-    env))
+    env)
+  (waits? [this]
+    true)
+  (set-wait! [this tf]
+    tf))
 
 (defn- stringify-keys
   "Shallowly un-keyword/un-symbol the keys in m"
