@@ -8,189 +8,195 @@
             [clojure.string :as str]
             [base64-clj.core :as base64]
             [clojure.pprint :as pprint]
-            [clojure.string :as string])
-  (:import [java.io File]
-           [java.util.concurrent Executors]))
+            [clojure.string :as string]
+            [clojure.data :refer [diff]]
+            [clojure.walk :as walk])
+  (:import [java.io File RandomAccessFile]
+           [java.nio ByteBuffer]
+           [java.util.concurrent Executors]
+           [com.amazonaws.services.lambda
+            AWSLambdaClient
+            AWSLambdaClientBuilder]
+           [com.amazonaws.services.lambda.model
+            GetFunctionConfigurationRequest
+            UpdateFunctionConfigurationRequest
+            FunctionCode
+            LogType
+            UpdateFunctionCodeRequest
+            CreateFunctionRequest
+            ResourceNotFoundException
+            ResourceConflictException]
+           [com.amazonaws.auth.profile
+            ProfileCredentialsProvider]
+           [com.amazonaws.services.identitymanagement
+            AmazonIdentityManagementClientBuilder]
+           [com.amazonaws.services.identitymanagement.model
+            GetRoleRequest
+            PutRolePolicyRequest
+            CreateRoleRequest
+            NoSuchEntityException]))
 
 (defn abs-path [^File f] (.getAbsolutePath f))
 
-(defmacro with-meta-config [config & body]
-  `(let [{aws-profile# :aws-profile region# :region} ~config]
-     (binding [args/*aws-profile* (or aws-profile# args/*aws-profile*)
-               args/*region*      (or region#      args/*region*)]
-       ~@body)))
+(defn- build-client [builder config]
+  (cond-> builder
+    (config :region)      (.withRegion (name (config :region)))
+    (config :aws-profile) (.withCredentials (ProfileCredentialsProvider.
+                                             (name (config :aws-profile))))
+    true                  .build))
 
-(defn meta-config []
-  (cond-> {}
-    args/*region*      (assoc :region  (name args/*region*))
-    args/*aws-profile* (assoc :profile (name args/*aws-profile*))))
+(def ->client
+  (memoize
+   (fn [config]
+     (-> (AWSLambdaClientBuilder/standard)
+         (build-client config)))))
 
-(defmulti ->cli-arg-value
-  (fn [k v] k))
+(defn update-alias! [spec]
+  (let [req (-> (com.amazonaws.services.lambda.model.UpdateAliasRequest.)
+                (.withFunctionName    (name (spec :name)))
+                (.withName            (name (spec :alias)))
+                (.withFunctionVersion (spec ::version)))]
+    (.update (->client spec) req)))
 
-(defmethod ->cli-arg-value :vpc-config [k v]
-  (let [subnets (:subnets v)
-        security-groups (:security-groups v)]
-    (string/join
-      ["SubnetIds=["
-       (string/join "," subnets)
-       "],SecurityGroupIds=["
-       (string/join "," security-groups)
-       "]"])))
+(defn create-alias! [spec]
+  (let [req (-> (com.amazonaws.services.lambda.model.CreateAliasRequest.)
+                (.withFunctionName    (name (spec :name)))
+                (.withName            (name (spec :alias)))
+                (.withFunctionVersion (spec ::version)))]
+    (try
+      (.createAlias (->client spec) req)
+      true
+      (catch ResourceConflictException _
+        nil))))
 
-(defmethod ->cli-arg-value :environment [k v]
-  (str
-    "Variables={"
-    (string/join
-      ","
-      (for [[k v] v]
-        (str (name k) "=" v)))
-    "}"))
+(defn- ->vpc-config [fn-spec]
+  (-> (com.amazonaws.services.lambda.model.VpcConfig.)
+      (.withSubnetIds      (-> fn-spec :vpc :subnets))
+      (.withSecurityGroups (-> fn-spec :vpc :security-groups))))
 
-(defmethod ->cli-arg-value :dead-letter-config [k v]
-  (str "TargetArn=" v))
+(defn- ->tracing-config [fn-spec]
+  (-> (com.amazonaws.services.lambda.model.TracingConfig.)
+      (.withMode ({"passthrough" "PassThrough"
+                   "active"      "Active"} (fn-spec :tracing)))))
 
-(defmethod ->cli-arg-value :default [k v]
-  (if (keyword? v) (name v) (str v)))
+(defn- ->env [fn-spec]
+  (-> (com.amazonaws.services.lambda.model.Environment.)
+      (.withVariables (fn-spec :env))))
 
-(defn ->cli-arg [k v]
-  [(str "--" (name k))
-   (->cli-arg-value k v)])
+(defn- build-config-req [req fn-spec]
+  (-> req
+      (.withFunctionName (fn-spec :name))
+      (.withHandler      (fn-spec :handler))
+      (.withMemorySize   (int (fn-spec :memory-size)))
+      (.withDescription  (fn-spec :description))
+      (.withRole         (fn-spec :role))
+      (.withRuntime      (fn-spec :runtime))
+      (.withTimeout      (int (fn-spec :timeout)))
+      (.withKMSKeyArn    (fn-spec :kms-key))
+      (cond-> (fn-spec :vpc)     (.withVpcConfig     (->vpc-config     fn-spec))
+              (fn-spec :tracing) (.withTracingConfig (->tracing-config fn-spec))
+              (fn-spec :env)     (.withEnvironment   (->env            fn-spec)))))
 
-(defn ->cli-args [m & [positional {:keys [preserve-names?]}]]
-  (let [m    (cond-> (merge (meta-config) m)
-               (not preserve-names?)
-               (set/rename-keys {:name :function-name :vpc :vpc-config :dead-letter :dead-letter-config :env :environment}))
-        args (flatten
-               (for [[k v] m]
-                 (->cli-arg k v)))]
-    (cond->> args positional (into positional))))
+(defn- zip-path->buffer [path]
+  (let [zip-f   (RandomAccessFile. path "r")
+        zip     (byte-array (.length zip-f))]
+    (.readFully zip-f zip)
+    (ByteBuffer/wrap zip)))
 
-(defn aws-cli! [service cmd args & [{:keys [fatal?] :or {fatal? true}}]]
-  (apply log :verbose "aws" service (name cmd) args)
-  (let [{:keys [exit err] :as r}
-        (apply shell/sh "aws" service (name cmd) args)]
-    (if (and fatal? (not (zero? exit)))
-      (leiningen.core.main/abort err)
-      r)))
+(defn- tidy-value [x]
+  (cond (keyword? x) (name x)
+        (symbol?  x) (name x)
+        (map?     x) x
+        (coll?    x) (sort x)
+        :else        x))
 
-(def lambda-cli! (partial aws-cli! "lambda"))
+(let [implicit-keys {:tracing "passthrough" :memory-size 128 :timeout 3}]
+  (defn- default-config [x]
+    (merge implicit-keys x)))
 
-(def fn-config-args
-  #{:name :role :handler :description :timeout :memory-size :runtime :vpc :dead-letter :env})
+(defn- tidy-config [m & []]
+  (let [m (walk/postwalk
+           (fn [form]
+             (if (map? form)
+               (into {}
+                 (for [[k v] form :when (and (not (nil? v))
+                                             (or (not (coll? v))
+                                                 (not-empty v)))]
+                   [k (tidy-value v)]))
+               form))
+           m)]
+    (cond-> m
+      (m :env) (update :env walk/stringify-keys))))
 
-(def fn-spec-defaults
-  {:vpc {:subnets [] :security-groups []} :dead-letter "" :env {}})
-
-(def create-function-args
-  (into fn-config-args
-    #{:zip-file :output :query}))
-
-(def update-function-code-args
-  (remove #{:vpc :dead-letter :env} create-function-args))
-
-(defn fn-spec->cli-args [fn-args {:keys [publish] :as fn-spec}]
-  (let [args (merge {:output "text" :query "Version"} fn-spec)]
-    (-> args
-        (select-keys fn-args)
-        (->cli-args (cond-> [] publish (conj "--publish"))))))
-
-(defn update-alias! [alias-name fn-name version]
-  (lambda-cli!
-    :update-alias
-    (->cli-args
-      {:function-name fn-name
-       :name alias-name
-       :function-version version}
-      nil
-      {:preserve-names? true})))
-
-(defn create-alias! [alias-name fn-name version]
-  (lambda-cli!
-   :create-alias
-   (->cli-args
-    {:function-name fn-name
-     :name alias-name
-     :function-version version}
-    nil
-    {:preserve-names? true})
-   {:fatal? false}))
-
-(def default-runtime "nodejs4.3")
-
-(defn- create-function! [fn-spec zip-path]
-  (let [args (fn-spec->cli-args
-               create-function-args
-               (merge {:runtime default-runtime} fn-spec {:zip-file zip-path}))]
-    (-> (lambda-cli! :create-function args) :out str/trim)))
+(defn- create-function! [fn-spec]
+  (let [fn-spec (tidy-config (default-config fn-spec))
+        req     (-> (build-config-req (CreateFunctionRequest.) fn-spec)
+                    (.withCode (-> (FunctionCode.)
+                                   (.withZipFile (zip-path->buffer (fn-spec ::zip-path))))))]
+    (-> (.createFunction (->client fn-spec) req)
+        .getVersion)))
 
 (defn- update-function-config! [fn-spec]
-  (lambda-cli!
-   :update-function-configuration
-   (-> (merge fn-spec-defaults fn-spec)
-       (select-keys fn-config-args)
-       ->cli-args)))
+  (let [fn-spec (tidy-config (default-config fn-spec))
+        req     (build-config-req (UpdateFunctionConfigurationRequest.) fn-spec)]
+    (.updateFunctionConfiguration (->client fn-spec) req)))
 
-(defn- update-function-code!
-  [{:keys [name publish] :as fn-spec} zip-path]
-  (let [args (merge (fn-spec->cli-args
-                      update-function-code-args
-                      {:name name :zip-file zip-path :publish publish}))]
-    (-> (lambda-cli! :update-function-code args)
-        :out
-        str/trim)))
+(defn- update-function-code! [fn-spec]
+  (let [fn-spec (tidy-config fn-spec)]
+    (let [req (-> (UpdateFunctionCodeRequest.)
+                  (.withFunctionName (fn-spec :name))
+                  (.withPublish      (boolean (fn-spec :publish)))
+                  (.withZipFile      (zip-path->buffer (fn-spec ::zip-path))))]
+      (-> (.updateFunctionCode (->client fn-spec) req)
+          .getVersion))))
 
-(defn- get-function-configuration! [{:keys [name]}]
-  (let [{:keys [exit out]} (lambda-cli!
-                            :get-function-configuration
-                            (->cli-args {:name name})
-                            {:fatal? false})]
-    (case exit
-      255 nil
-      0   (json/parse-string out))))
+(defn- fn-config->map [c]
+  (tidy-config
+   {:name        (.getFunctionName c)
+    :env         (some->> c .getEnvironment .getVariables (into {}))
+    :tracing     (some->  c .getTracingConfig .getMode str/lower-case)
+    :dead-letter (some->  c .getDeadLetterConfig .getTargetArn)
+    :vpc         (when-let [vpc (.getVpcConfig c)]
+                   {:subnets          (into [] (.getSubnetIds vpc))
+                    :security-groups  (into [] (.getSecurityGroupIds vpc))})
+    :kms-key     (.getKMSKeyArn   c)
+    :memory-size (.getMemorySize  c)
+    :description (not-empty (.getDescription c))
+    :role        (.getRole        c)
+    :runtime     (.getRuntime     c)
+    :handler     (.getHandler     c)
+    :timeout     (.getTimeout     c)}))
 
-(defn normalize-config [config]
-  (-> config
-      (update-in [:vpc :subnets] sort)
-      (update-in [:vpc :security-groups] sort)
-      (update-in [:env] clojure.walk/stringify-keys)))
+(defn- get-function-configuration! [f]
+  (let [req (-> (GetFunctionConfigurationRequest.)
+                (.withFunctionName (name (f :name))))]
+    (try
+      (-> (.getFunctionConfiguration (->client f) req)
+          fn-config->map)
+      (catch ResourceNotFoundException e
+        nil))))
 
-(defn remote-config->local-config [remote]
-  (let [remote (set/rename-keys remote {"FunctionName" :name
-                                        "VpcConfig" :vpc
-                                        "DeadLetterConfig" :dead-letter
-                                        "Environment" :env
-                                        "Description" :description
-                                        "Timeout" :timeout
-                                        "Handler" :handler
-                                        "Runtime" :runtime
-                                        "MemorySize" :memory-size
-                                        "Version" :version
-                                        "Role" :role})]
-    (merge
-      remote
-      (if-let [vpc (:vpc remote)]
-        (assoc remote :vpc
-          (-> vpc
-              (select-keys #{"SubnetIds" "SecurityGroupIds"})
-              (set/rename-keys {"SubnetIds" :subnets "SecurityGroupIds" :security-groups}))))
-      {:dead-letter (get-in remote [:dead-letter "TargetArn"] "")}
-      {:env (-> (get-in remote [:env "Variables"] {}))})))
-
-(defn same-config? [remote local]
-  (let [remote (-> remote remote-config->local-config normalize-config)
-        local  (-> (merge fn-spec-defaults local) (select-keys fn-config-args) normalize-config)]
-    (= (select-keys remote (keys local)) local)))
+(let [ks #{:env :tracing :dead-letter :vpc :kms-key :memory-size :description
+           :role :runtime :handler :timeout}]
+ (defn same-config? [remote local]
+   (let [local  (-> local default-config tidy-config (select-keys ks))
+         remote (select-keys remote ks)]
+     (println "Remote" remote)
+     (println "Local" local)
+     (or (= local (select-keys remote ks))
+         (do
+           (log :verbose "Config diff:" (take 2 (diff local remote)))
+           false)))))
 
 (defn- deploy-function!
-  [zip-path {fn-name :name create? :create :as fn-spec}]
+  [{fn-name :name create? :create :as fn-spec}]
   (if-let [remote-config (get-function-configuration! fn-spec)]
     (do
       (when-not (same-config? remote-config fn-spec)
         (update-function-config! fn-spec))
-      (update-function-code! fn-spec zip-path))
+      (update-function-code! fn-spec))
     (if create?
-      (create-function! fn-spec zip-path)
+      (create-function! fn-spec)
       (leiningen.core.main/abort
        "Function" fn-name "doesn't exist & :create not set"))))
 
@@ -209,84 +215,68 @@
 
 (defn deploy! [zip-path cljs-lambda]
   (do-functions!
-   (fn [{fn-alias :alias fn-name :name :as fn-spec}]
-     (with-meta-config fn-spec
-       (let [version (deploy-function! (str "fileb://" zip-path) fn-spec)]
-         (if fn-alias
-           (let [{:keys [exit err] :as r} (create-alias! fn-alias fn-name version)]
-             (when-not (zero? exit)
-               (if (.contains err "ResourceConflictException")
-                 (update-alias! fn-alias fn-name version)
-                 (leiningen.core.main/abort err))))
-           (when version
-             (println version))))))
+   (fn [fn-spec]
+     (let [version (deploy-function! (assoc fn-spec ::zip-path zip-path))
+           fn-spec (assoc fn-spec ::version version)]
+       (if (fn-spec :alias)
+         (when-not (create-alias! fn-spec)
+           (update-alias! fn-spec))
+         (println version))))
    cljs-lambda))
 
 (defn update-config! [{fn-name :name :as fn-spec}]
-  (with-meta-config fn-spec
-    (if-let [remote-config (get-function-configuration! fn-spec)]
-      (when-not (same-config? remote-config fn-spec)
-        (update-function-config! fn-spec))
-      (leiningen.core.main/abort fn-name "doesn't exist & can't create"))))
+  (if-let [remote-config (get-function-configuration! fn-spec)]
+    (when-not (same-config? remote-config fn-spec)
+      (update-function-config! fn-spec))
+    (leiningen.core.main/abort fn-name "doesn't exist & can't create")))
 
 (defn update-configs! [cljs-lambda]
   (do-functions! update-config! cljs-lambda))
 
-(defn invoke! [fn-name payload {:keys [keyword-args] :as cljs-lambda}]
-  (let [out-file    (File/createTempFile "lambda-output" ".json")
-        out-path    (abs-path out-file)
-        qualifier   (some keyword-args [:qualifier :version])
-        optional    (cond-> {} qualifier (assoc :qualifier qualifier))
-        args        (-> {:function-name fn-name
-                         :payload payload
-                         :log-type "Tail"
-                         :query "LogResult"
-                         :output "text"}
-                        (merge optional)
-                        (->cli-args [out-path]))
-        {logs :out} (lambda-cli! :invoke args)]
-    (log :verbose (base64/decode (str/trim logs)))
-    (let [output (slurp out-path)]
-      (pprint/pprint
-       (try
-         (json/parse-string output true)
-         (catch Exception e
-           [:not-json output]))))))
+(defn invoke! [fn-name payload {ks :keyword-args :as cljs-lambda}]
+  (let [qual (some ks [:qualifier :version])
+        req  (-> (com.amazonaws.services.lambda.model.InvokeRequest.)
+                 (.withFunctionName (name fn-name))
+                 (.withLogType      LogType/Tail)
+                 (.withPayload      payload)
+                 (cond-> qual (.withQualifier (name qual))))
+        resp (.invoke (->client cljs-lambda) req)
+        logs (-> resp .getLogResult str/trim base64/decode)
+        body (-> resp .getPayload .array (String. "UTF-8"))]
+    (log :verbose logs)
+    (pprint/pprint
+     (try
+       (json/parse-string body true)
+       (catch Exception _
+         [:not-json body])))))
 
-(defn- get-role-arn! [role-name]
-  (let [args (->cli-args {:role-name role-name :output "text" :query "Role.Arn"})
-        {:keys [exit out]}
-        (aws-cli! "iam" "get-role" args {:fatal? false})]
-    (when (zero? exit)
-      (str/trim out))))
+(defn- get-role-arn! [config]
+  (let [req (-> (GetRoleRequest.)
+                (.withRoleName (name (config :role-name))))]
+    (try
+      (-> (.getRole (config ::client) req) .getRole .getArn)
+      (catch NoSuchEntityException _
+        nil))))
 
-(defn- assume-role-policy-doc! [role-name file-path]
-  (-> (aws-cli!
-       "iam" "create-role"
-       (->cli-args
-        {:role-name role-name
-         :assume-role-policy-document (str "file://" file-path)
-         :output "text"
-         :query "Role.Arn"}))
-      :out
-      str/trim))
+(defn- assume-role-policy-doc! [config]
+  (let [req  (-> (CreateRoleRequest.)
+                 (.withRoleName                 (name (config :role-name)))
+                 (.withAssumeRolePolicyDocument (config :role)))
+        resp (.createRole (config ::client) req)]
+    (-> resp .getRole .getArn)))
 
-(defn- put-role-policy! [role-name file-path]
-  (let [args (->cli-args
-              {:role-name role-name
-               :policy-name role-name
-               :policy-document (str "file://" file-path)})]
-    (aws-cli! "iam" "put-role-policy" args)))
+(defn- put-role-policy! [config]
+  (let [req (-> (PutRolePolicyRequest.)
+                (.withPolicyDocument (config :policy))
+                (.withPolicyName     (name (config :role-name)))
+                (.withRoleName       (name (config :role-name))))]
+    (.putRolePolicy (config ::client) req)))
 
-(defn install-iam-role! [role-name role policy]
-  (if-let [role-arn (get-role-arn! role-name)]
-    role-arn
-    (let [role-tmp-file   (File/createTempFile "iam-role" nil)
-          policy-tmp-file (File/createTempFile "iam-policy" nil)]
-      (spit role-tmp-file role)
-      (spit policy-tmp-file policy)
-      (let [role-arn (assume-role-policy-doc! role-name (abs-path role-tmp-file))]
-        (put-role-policy! role-name (abs-path policy-tmp-file))
-        (.delete role-tmp-file)
-        (.delete policy-tmp-file)
+(defn install-iam-role! [config]
+  (let [client (build-client (AmazonIdentityManagementClientBuilder/standard) config)
+        config (assoc config ::client client)]
+    (if-let [role-arn (get-role-arn! config)]
+      role-arn
+      (let [role-arn (assume-role-policy-doc! config)]
+        (put-role-policy! config)
         role-arn))))

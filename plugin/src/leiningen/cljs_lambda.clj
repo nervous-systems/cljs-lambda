@@ -70,7 +70,7 @@
 
 (def fn-keys
   #{:name :create :region :memory-size :role :invoke :description :timeout
-    :publish :alias :runtime})
+    :publish :alias :runtime :tracing :dead-letter :kms-key})
 
 (defn- augment-fn [{:keys [defaults]} cli-kws fn-spec]
   (merge default-defaults
@@ -198,11 +198,12 @@
 
 (defn default-iam-role
   "Install a Lambda-compatible IAM role, and stick it in project.clj"
-  [{:keys [:cljs-lambda] :as project}]
+  [{:keys [cljs-lambda] :as project}]
   (let [arn (aws/install-iam-role!
-             :cljs-lambda-default
-             (slurp (io/resource "default-iam-role.json"))
-             (slurp (io/resource "default-iam-policy.json")))]
+             (assoc cljs-lambda
+               :role-name :cljs-lambda-default
+               :role      (slurp (io/resource "default-iam-role.json"))
+               :policy    (slurp (io/resource "default-iam-policy.json"))))]
     (println arn)
     (change/change project [:cljs-lambda :defaults]
                    (fn [m & _] (assoc m :role arn)))))
