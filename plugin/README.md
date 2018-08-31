@@ -66,6 +66,7 @@ invoked.  An example:
  :memory-size 128 ;; MB
  :vpc {:subnets [] :security-groups []}
  :dead-letter "arn:..."
+ :tracing :passthrough ;; Optionally :active
  :env {"VAR_A" "VALUE_A"
        "VAR_B" "VALUE_B"}}
 ```
