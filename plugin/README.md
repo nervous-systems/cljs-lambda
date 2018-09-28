@@ -8,7 +8,7 @@ Project](http://clojars.org/io.nervous/lein-cljs-lambda/latest-version.svg)](htt
 
 Using this project will require a recent [Node](https://nodejs.org/) runtime,
 and a properly-configured (`aws configure`) [AWS
-CLI](https://github.com/aws/aws-cli) installation **>= 1.7.31**.  Please run
+CLI](https://github.com/aws/aws-cli) installation **>= 1.7.31**; you'll need to make sure your `Default output format` is set to `json`.  Please run
 `pip install --upgrade awscli` if you're using an older version (`aws
 --version`).
 
